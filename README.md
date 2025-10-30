@@ -1,4 +1,4 @@
-# Skill Fox 🦊
+# SkillFox
 
 A full-stack web application for user authentication and learning progress tracking.
 
