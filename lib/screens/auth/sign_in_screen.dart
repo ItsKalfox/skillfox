@@ -52,7 +52,13 @@ class _SignInScreenState extends State<SignInScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
+
+          // ✅ Layer 1 — gradient background fills entire screen
+          Container(
+            decoration: const BoxDecoration(gradient: AppColors.mainGradient),
+          ),
+
+          // ✅ Layer 2 — main content inside SafeArea
           SafeArea(
             child: Column(
               children: [
@@ -69,7 +75,8 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text('Sign in',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
-                            fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white,
+                            fontSize: 20, fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -89,7 +96,10 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.only(
+                        top: 24, left: 45, right: 45,
+                        bottom: 120, // ✅ prevents content hiding behind bottom line
+                      ),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -108,17 +118,13 @@ class _SignInScreenState extends State<SignInScreen> {
                               ),
                             ),
                             const SizedBox(height: 40),
-                            // Illustration placeholder
+                            // ✅ lock-clipart.png illustration
                             Center(
-                              child: Container(
-                                width: 130, height: 130,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary4,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: Text('🔒', style: TextStyle(fontSize: 60)),
-                                ),
+                              child: Image.asset(
+                                'assets/images/lock-clipart.png',
+                                width: 180,
+                                height: 180,
+                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: 32),
@@ -133,14 +139,17 @@ class _SignInScreenState extends State<SignInScreen> {
                               placeholder: 'Password',
                               obscure: true,
                               controller: _passCtrl,
-                              validator: (v) => v == null || v.isEmpty ? 'Password required' : null,
+                              validator: (v) => v == null || v.isEmpty
+                                  ? 'Password required'
+                                  : null,
                             ),
                             const SizedBox(height: 8),
                             Align(
                               alignment: Alignment.centerRight,
                               child: GestureDetector(
                                 onTap: () => Navigator.push(context,
-                                  MaterialPageRoute(builder: (_) => const ForgotPasswordScreen())),
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPasswordScreen())),
                                 child: Text('Forgot your password ?',
                                   style: GoogleFonts.poppins(
                                     fontSize: 12, color: AppColors.neutral4,
@@ -148,7 +157,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 35),
                             GradientButton(
                               text: 'Sign in',
                               onPressed: _signIn,
@@ -159,11 +168,13 @@ class _SignInScreenState extends State<SignInScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text("Don't have an account? ",
-                                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.neutral1),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12, color: AppColors.neutral1),
                                 ),
                                 GestureDetector(
                                   onTap: () => Navigator.push(context,
-                                    MaterialPageRoute(builder: (_) => const SignupTypeScreen())),
+                                    MaterialPageRoute(
+                                      builder: (_) => const SignupTypeScreen())),
                                   child: Text('Sign Up',
                                     style: GoogleFonts.poppins(
                                       fontSize: 12, fontWeight: FontWeight.w600,
@@ -182,6 +193,16 @@ class _SignInScreenState extends State<SignInScreen> {
               ],
             ),
           ),
+
+          // ✅ Layer 3 — bottom line on top of everything, ignores SafeArea
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
+            ),
+          ),
+
         ],
       ),
     );
