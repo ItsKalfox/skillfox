@@ -93,7 +93,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.only(top: 24, left: 40, right: 40),
                       child: Column(
                         children: [
                           const SizedBox(height: 24),
@@ -118,7 +118,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                     color: AppColors.textDefault,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 16),
                                 Row(
                                   children: [
                                     Expanded(
@@ -132,7 +132,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                     GestureDetector(
                                       onTap: _resend,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                         decoration: BoxDecoration(
                                           gradient: AppColors.mainGradient,
                                           borderRadius: BorderRadius.circular(15),
@@ -146,7 +146,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 16),
                                 RichText(
                                   text: TextSpan(children: [
                                     TextSpan(
@@ -162,11 +162,11 @@ class _OtpScreenState extends State<OtpScreen> {
                                     ),
                                   ]),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 10),
                                 Text('This code will expire 10 minutes after this message.',
                                   style: GoogleFonts.poppins(fontSize: 14, color: AppColors.neutral2),
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 30),
                                 GradientButton(
                                   text: 'Change password',
                                   onPressed: _verify,
@@ -181,6 +181,13 @@ class _OtpScreenState extends State<OtpScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

@@ -9,6 +9,7 @@ class AppTextField extends StatefulWidget {
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
   final String? label;
+  final void Function(String)? onChanged;
 
   const AppTextField({
     super.key,
@@ -18,6 +19,7 @@ class AppTextField extends StatefulWidget {
     this.validator,
     this.keyboardType = TextInputType.text,
     this.label,
+    this.onChanged,
   });
 
   @override
@@ -45,6 +47,7 @@ class _AppTextFieldState extends State<AppTextField> {
           obscureText: widget.obscure && !_showPassword,
           keyboardType: widget.keyboardType,
           validator: widget.validator,
+          onChanged: widget.onChanged,
           style: GoogleFonts.poppins(fontSize: 14, color: AppColors.neutral1),
           decoration: InputDecoration(
             hintText: widget.placeholder,

@@ -20,35 +20,41 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _confirmCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
-  bool _enabled = false;
 
-  void _checkEnabled() {
-    setState(() {
-      _enabled = _passCtrl.text.isNotEmpty &&
-          _confirmCtrl.text == _passCtrl.text;
-    });
+  // ✅ Computed property — no need for _checkEnabled() at all
+  bool get _enabled =>
+      _passCtrl.text.isNotEmpty &&
+      _confirmCtrl.text.isNotEmpty &&
+      _confirmCtrl.text == _passCtrl.text;
+
+  @override
+  void dispose() {
+    _passCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) return;
     final passError = Validators.password(_passCtrl.text);
     if (passError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(passError)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(passError)));
       return;
     }
     setState(() => _loading = true);
     try {
-      // Use Firebase password reset flow via email
       await FirebaseAuth.instance.sendPasswordResetEmail(email: widget.email);
-      // For direct update, you need the user to be signed in.
-      // Storing new password hash is not supported directly — use Admin SDK in backend.
-      // Here we assume the OTP verified, so update via Firestore flag and handle on backend.
-      await FirebaseFirestore.instance.collection('password_resets').doc(widget.email).set({
-        'newPassword': _passCtrl.text, // Handle securely on backend
+      await FirebaseFirestore.instance
+          .collection('password_resets')
+          .doc(widget.email)
+          .set({
+        'newPassword': _passCtrl.text,
         'requestedAt': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const PasswordSuccessScreen()));
+      Navigator.push(context,
+        MaterialPageRoute(builder: (_) => const PasswordSuccessScreen()));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -79,7 +85,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         child: Text('Change password',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
-                            fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white,
+                            fontSize: 20, fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -93,11 +100,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     decoration: const BoxDecoration(
                       color: Color(0xFFFFFDFF),
                       borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(30), topRight: Radius.circular(30),
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.only(top: 24, left: 40, right: 40),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -117,12 +125,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ),
                               child: Column(
                                 children: [
+                                  // ✅ onChanged calls setState to recompute _enabled
                                   AppTextField(
                                     label: 'Type your new password',
                                     placeholder: '••••••••••••',
                                     obscure: true,
                                     controller: _passCtrl,
                                     validator: Validators.password,
+                                    onChanged: (_) => setState(() {}),
                                   ),
                                   const SizedBox(height: 16),
                                   AppTextField(
@@ -134,8 +144,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       if (v != _passCtrl.text) return 'Passwords do not match';
                                       return null;
                                     },
+                                    onChanged: (_) => setState(() {}),
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 45),
+                                  // ✅ _enabled is now a getter — always up to date
                                   GradientButton(
                                     text: 'Change password',
                                     onPressed: _enabled ? _changePassword : null,
@@ -151,6 +163,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

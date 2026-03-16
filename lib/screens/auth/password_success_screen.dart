@@ -40,12 +40,20 @@ class PasswordSuccessScreen extends StatelessWidget {
                       ),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(32),
+                      padding: const EdgeInsets.only(top: 24, left: 40, right: 40, bottom: 120),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          const Text('✅', style: TextStyle(fontSize: 80)),
-                          const SizedBox(height: 24),
+
+                          // ✅ Replaced ✅ emoji with password-change-clipart.png
+                          Image.asset(
+                            'assets/images/password-change-clipart.png',
+                            width: 320,
+                            height: 320,
+                            fit: BoxFit.contain,
+                          ),
+
+                          const SizedBox(height: 0),
                           Text('Change password successfully!',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
@@ -53,13 +61,14 @@ class PasswordSuccessScreen extends StatelessWidget {
                               color: AppColors.primary,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 20),
                           Text(
                             'You have successfully changed your password.\nPlease use the new password when signing in.',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(fontSize: 14, color: AppColors.neutral1),
+                            style: GoogleFonts.poppins(
+                              fontSize: 14, color: AppColors.neutral1),
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 40),
                           GradientButton(
                             text: 'Ok',
                             onPressed: () => Navigator.pushAndRemoveUntil(
@@ -74,6 +83,13 @@ class PasswordSuccessScreen extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],
