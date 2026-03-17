@@ -44,7 +44,7 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -65,30 +65,26 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  Container(
-                                    width: 120, height: 120,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary4,
-                                      shape: BoxShape.circle,
-                                    ),
+                                  Image.asset(
+                                    'assets/images/signup-clipart.png',
+                                    width: 220,
+                                    height: 220,
+                                    fit: BoxFit.contain,
                                   ),
-                                  const Icon(Icons.engineering, size: 64, color: AppColors.primary),
-                                  // Decorative dots
-                                  ...ScreenHelpers.buildDots(),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 8),
                             AppTextField(placeholder: 'Full Name', controller: _nameCtrl,
                               validator: (v) => Validators.required(v, 'Full Name')),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 22),
                             AppTextField(placeholder: 'Phone Number', controller: _phoneCtrl,
                               keyboardType: TextInputType.phone,
                               validator: Validators.phone),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 22),
                             AppTextField(placeholder: 'National ID', controller: _idCtrl,
                               validator: (v) => Validators.required(v, 'National ID')),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 50),
                             // Arrow button
                             Align(
                               alignment: Alignment.centerRight,
@@ -105,16 +101,16 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                                   }
                                 },
                                 child: Container(
-                                  width: 56, height: 56,
+                                  width: 70, height: 70,
                                   decoration: const BoxDecoration(
                                     gradient: AppColors.mainGradient,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.arrow_forward, color: Colors.white, size: 24),
+                                  child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 30),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 30),
                             ScreenHelpers.signInLink(context),
                           ],
                         ),
@@ -123,6 +119,13 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

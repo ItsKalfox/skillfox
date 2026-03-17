@@ -151,7 +151,7 @@ class _SignupTypeScreenState extends State<SignupTypeScreen> {
           // ✅ Layer 4 — arrow button on very top of everything
           Positioned(
             bottom: 200,
-            right: 28,
+            right: 30,
             child: GestureDetector(
               onTap: _selected == null ? null : () {
                 if (_selected == 'worker') {
@@ -188,7 +188,7 @@ class _SignupTypeScreenState extends State<SignupTypeScreen> {
 }
 
 class _TypeOption extends StatelessWidget {
-  final String imagePath; // ✅ changed from IconData to String
+  final String imagePath;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -214,10 +214,20 @@ class _TypeOption extends StatelessWidget {
               color: AppColors.primary4,
               shape: BoxShape.circle,
               border: selected
-                  ? Border.all(color: AppColors.primary, width: 2.5)
+                  ? Border.all(color: AppColors.primary, width: 3.5)
                   : null,
+              // ✅ shadow appears when selected, gone when not
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.35),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 5),
+                      ),
+                    ]
+                  : [],
             ),
-            // ✅ PNG image inside the circle
             child: Padding(
               padding: const EdgeInsets.all(0),
               child: Image.asset(
