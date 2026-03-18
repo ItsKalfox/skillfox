@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/worker.dart';
+import '../../../models/worker.dart';
 
 class SectionWorkersScreen extends StatelessWidget {
   final String title;
@@ -10,6 +10,13 @@ class SectionWorkersScreen extends StatelessWidget {
     required this.title,
     required this.workers,
   });
+
+  String _travelFeeLabel(Worker worker) {
+    if (worker.hasOffer && worker.offerType == 'free_travel') {
+      return 'Travel fee LKR 0';
+    }
+    return 'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +34,9 @@ class SectionWorkersScreen extends StatelessWidget {
               itemCount: workers.length,
               itemBuilder: (context, index) {
                 final worker = workers[index];
+                final offerBadge = worker.offerType == 'free_travel'
+                    ? 'FREE TRAVEL'
+                    : 'OFFER';
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -73,7 +83,7 @@ class SectionWorkersScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 5),
                             Text(
-                              'LKR ${worker.price} • Travel fee LKR ${worker.travelFee.toStringAsFixed(0)} • ${worker.travelMinutes} min',
+                              '${_travelFeeLabel(worker)} • ${worker.travelMinutes} min',
                               style: const TextStyle(
                                 fontSize: 10.5,
                                 color: Color(0xFF8A8A8A),
@@ -109,13 +119,37 @@ class SectionWorkersScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Icon(
-                        worker.isFavorite
-                            ? Icons.favorite
-                            : Icons.favorite_border_rounded,
-                        color: worker.isFavorite
-                            ? Colors.redAccent
-                            : Colors.black45,
+                      Column(
+                        children: [
+                          if (worker.hasOffer)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE5E5),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                offerBadge,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.redAccent,
+                                ),
+                              ),
+                            ),
+                          Icon(
+                            worker.isFavorite
+                                ? Icons.favorite
+                                : Icons.favorite_border_rounded,
+                            color: worker.isFavorite
+                                ? Colors.redAccent
+                                : Colors.black45,
+                          ),
+                        ],
                       ),
                     ],
                   ),

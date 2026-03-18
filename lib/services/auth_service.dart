@@ -11,7 +11,8 @@ class AuthService {
   Future<Map<String, dynamic>?> signIn(String email, String password) async {
     try {
       final cred = await _auth.signInWithEmailAndPassword(
-        email: email, password: password,
+        email: email,
+        password: password,
       );
       final uid = cred.user!.uid;
       final doc = await _firestore.collection('users').doc(uid).get();
@@ -50,5 +51,37 @@ class AuthService {
     final doc = await _firestore.collection('users').doc(uid).get();
     if (!doc.exists) return null;
     return doc.data()?['status'] as String?;
+  }
+
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null || user.email == null) {
+        return 'User not logged in';
+      }
+
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(newPassword);
+
+      return null;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        return 'Current password is incorrect';
+      }
+      if (e.code == 'weak-password') {
+        return 'New password is too weak';
+      }
+      return e.message ?? 'Failed to update password';
+    } catch (e) {
+      return 'Failed to update password';
+    }
   }
 }

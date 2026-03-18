@@ -6,7 +6,7 @@ import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/gradient_button.dart';
 import '../../widgets/app_text_field.dart';
-import '../customer/customer_dashboard_screen.dart';
+import '../customer/dashboard/customer_dashboard_screen.dart';
 import '../signup/signup_type_screen.dart';
 import 'forgot_password_screen.dart';
 import '../dashboard/dashboard_screen.dart';

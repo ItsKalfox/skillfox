@@ -1,9 +1,14 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../models/worker.dart';
-import '../../services/location_service.dart';
-import '../../services/worker_service.dart';
+import '../../../models/worker.dart';
+import '../../../models/user_address.dart';
+import '../../../services/location_service.dart';
+import '../../../services/worker_service.dart';
+import '../../../services/favorite_service.dart';
+import '../../../services/address_service.dart';
+import '../../../core/utils/week_helper.dart';
+import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,6 +21,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService();
   final WorkerService _workerService = WorkerService();
+  final FavoriteService _favoriteService = FavoriteService();
+  final AddressService _addressService = AddressService();
 
   String selectedCategory = 'All';
   bool offersOnly = false;
@@ -23,6 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool highestRatedOnly = false;
 
   Future<Position?>? _locationFuture;
+
+  UserAddress? _selectedAddress;
+  String _selectedAddressLabel = 'Home';
+  bool _isLoadingDefaultAddress = true;
 
   final List<_CategoryData> categories = const [
     _CategoryData(label: 'All', imagePath: ''),
@@ -35,12 +46,54 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
     _CategoryData(label: 'Cleaner', imagePath: 'assets/icons/cleaner.png'),
     _CategoryData(label: 'Caregiver', imagePath: 'assets/icons/caregiver.png'),
+    _CategoryData(label: 'Mason', imagePath: 'assets/icons/mason.png'),
+    _CategoryData(label: 'Handyman', imagePath: 'assets/icons/handyman.png'),
+    _CategoryData(label: 'Painter', imagePath: 'assets/icons/painter.png'),
+    _CategoryData(label: 'Gardener', imagePath: 'assets/icons/gardener.png'),
+    _CategoryData(label: 'Driver', imagePath: 'assets/icons/driver.png'),
+    _CategoryData(
+      label: 'IT Support',
+      imagePath: 'assets/icons/it_support.png',
+    ),
   ];
 
   @override
   void initState() {
     super.initState();
     _locationFuture = _locationService.getCurrentLocation();
+    _loadDefaultAddress();
+  }
+
+  Future<void> _loadDefaultAddress() async {
+    final defaultAddress = await _addressService.getDefaultAddress();
+
+    if (!mounted) return;
+
+    setState(() {
+      _selectedAddress = defaultAddress;
+      _selectedAddressLabel =
+          (defaultAddress != null && defaultAddress.label.isNotEmpty)
+          ? defaultAddress.label
+          : 'Home';
+      _isLoadingDefaultAddress = false;
+    });
+  }
+
+  Future<void> _openAddresses() async {
+    final result = await Navigator.push<UserAddress>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CustomerAddressesScreen(selectedAddress: _selectedAddress),
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedAddress = result;
+        _selectedAddressLabel = result.label.isEmpty ? 'Home' : result.label;
+      });
+    }
   }
 
   List<Worker> applyFilters(List<Worker> workers) {
@@ -197,8 +250,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _travelFeeLabel(Worker worker) {
+    if (worker.hasOffer && worker.offerType == 'free_travel') {
+      return 'Travel fee LKR 0';
+    }
+    return 'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingDefaultAddress) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_selectedAddress?.location != null) {
+      final selectedLocation = _selectedAddress!.location!;
+
+      return _buildHomeContent(
+        customerLat: selectedLocation.latitude,
+        customerLng: selectedLocation.longitude,
+      );
+    }
+
     return FutureBuilder<Position?>(
       future: _locationFuture,
       builder: (context, locationSnapshot) {
@@ -224,47 +297,96 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        return StreamBuilder<List<Worker>>(
-          stream: _workerService.getWorkersForCustomerLocation(
-            customerLat: customerPosition.latitude,
-            customerLng: customerPosition.longitude,
-          ),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
-            }
+        return _buildHomeContent(
+          customerLat: customerPosition.latitude,
+          customerLng: customerPosition.longitude,
+        );
+      },
+    );
+  }
 
-            if (snapshot.hasError) {
-              return Scaffold(
-                body: Center(child: Text('Error: ${snapshot.error}')),
-              );
-            }
+  Widget _buildHomeContent({
+    required double customerLat,
+    required double customerLng,
+  }) {
+    return StreamBuilder<List<Worker>>(
+      stream: _workerService.getWorkersForCustomerLocation(
+        customerLat: customerLat,
+        customerLng: customerLng,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-            final allWorkers = snapshot.data ?? [];
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(child: Text('Error: ${snapshot.error}')),
+          );
+        }
+
+        final allWorkers = snapshot.data ?? [];
+
+        return StreamBuilder<Set<String>>(
+          stream: _favoriteService.getFavoriteWorkerIds(),
+          builder: (context, favoriteSnapshot) {
+            final favoriteIds = favoriteSnapshot.data ?? <String>{};
+
+            final workersWithFavorites = allWorkers.map((worker) {
+              return Worker(
+                id: worker.id,
+                name: worker.name,
+                category: worker.category,
+                rating: worker.rating,
+                ratingCount: worker.ratingCount,
+                completedJobsCount: worker.completedJobsCount,
+                distanceKm: worker.distanceKm,
+                travelMinutes: worker.travelMinutes,
+                travelFee: worker.travelFee,
+                hasOffer: worker.hasOffer,
+                offerType: worker.offerType,
+                isFeatured: worker.isFeatured,
+                featuredWeekKey: worker.featuredWeekKey,
+                isFavorite: favoriteIds.contains(worker.id),
+                profilePhotoUrl: worker.profilePhotoUrl,
+                address: worker.address,
+              );
+            }).toList();
+
+            final currentWeek = getCurrentWeekKey();
 
             final featured = applyFilters(
-              allWorkers.where((worker) => worker.isFeatured).toList(),
+              workersWithFavorites
+                  .where(
+                    (worker) =>
+                        worker.isFeatured &&
+                        worker.featuredWeekKey == currentWeek,
+                  )
+                  .toList(),
             );
 
             final bookAgain = applyFilters(const <Worker>[]);
 
             final nearby = applyFilters(
-              allWorkers.where((worker) => worker.distanceKm <= 10).toList()
+              workersWithFavorites
+                  .where((worker) => worker.distanceKm <= 10)
+                  .toList()
                 ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm)),
             );
 
             final offers = applyFilters(
-              allWorkers.where((worker) => worker.hasOffer).toList(),
+              workersWithFavorites.where((worker) => worker.hasOffer).toList(),
             );
 
             final highestRated = applyFilters(
-              [...allWorkers]..sort((a, b) => b.rating.compareTo(a.rating)),
+              [...workersWithFavorites]
+                ..sort((a, b) => b.rating.compareTo(a.rating)),
             ).where((worker) => worker.rating >= 4.8).toList();
 
             final categoryListResults = applyFilters(
-              [...allWorkers]
+              [...workersWithFavorites]
                 ..sort((a, b) => a.travelMinutes.compareTo(b.travelMinutes)),
             );
 
@@ -285,6 +407,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             selectedCategory = category;
                           });
                         },
+                        titleText: _selectedAddressLabel,
+                        onAddressTap: _openAddresses,
                       ),
                       const SizedBox(height: 6),
                       Padding(
@@ -339,7 +463,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 )
                               else
                                 ...categoryListResults.map(
-                                  (worker) => _WorkerListTile(worker: worker),
+                                  (worker) => _WorkerListTile(
+                                    worker: worker,
+                                    travelFeeLabel: _travelFeeLabel(worker),
+                                    onFavoriteTap: () =>
+                                        _favoriteService.toggleFavorite(
+                                          worker.id,
+                                          worker.isFavorite,
+                                        ),
+                                  ),
                                 ),
                             ] else ...[
                               RichText(
@@ -516,7 +648,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final preview = workers.take(count).toList();
     return Column(
       children: preview
-          .map((worker) => _WorkerListTile(worker: worker))
+          .map(
+            (worker) => _WorkerListTile(
+              worker: worker,
+              travelFeeLabel: _travelFeeLabel(worker),
+              onFavoriteTap: () =>
+                  _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
+            ),
+          )
           .toList(),
     );
   }
@@ -528,7 +667,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final preview = workers.take(count).toList();
     return Column(
-      children: preview.map((worker) => _OfferTile(worker: worker)).toList(),
+      children: preview
+          .map(
+            (worker) => _OfferTile(
+              worker: worker,
+              travelFeeLabel: _travelFeeLabel(worker),
+              onFavoriteTap: () =>
+                  _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -550,7 +698,14 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
       ),
-      itemBuilder: (_, index) => _WorkerCard(worker: preview[index]),
+      itemBuilder: (_, index) => _WorkerCard(
+        worker: preview[index],
+        travelFeeLabel: _travelFeeLabel(preview[index]),
+        onFavoriteTap: () => _favoriteService.toggleFavorite(
+          preview[index].id,
+          preview[index].isFavorite,
+        ),
+      ),
     );
   }
 }
@@ -566,11 +721,15 @@ class _HomeHeaderCard extends StatelessWidget {
   final List<_CategoryData> categories;
   final String selectedCategory;
   final ValueChanged<String> onCategoryTap;
+  final String titleText;
+  final VoidCallback onAddressTap;
 
   const _HomeHeaderCard({
     required this.categories,
     required this.selectedCategory,
     required this.onCategoryTap,
+    required this.titleText,
+    required this.onAddressTap,
   });
 
   @override
@@ -590,23 +749,30 @@ class _HomeHeaderCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
             child: Row(
-              children: const [
-                Text(
-                  'Home',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+              children: [
+                GestureDetector(
+                  onTap: onAddressTap,
+                  child: Row(
+                    children: [
+                      Text(
+                        titleText,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(width: 4),
-                Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                Spacer(),
-                Icon(
+                const Spacer(),
+                const Icon(
                   Icons.notifications_none_rounded,
                   color: Colors.white,
                   size: 21,
@@ -637,7 +803,7 @@ class _HomeHeaderCard extends StatelessWidget {
                   return GestureDetector(
                     onTap: () => onCategoryTap(category.label),
                     child: SizedBox(
-                      width: 66,
+                      width: 72,
                       child: Column(
                         children: [
                           Container(
@@ -669,12 +835,17 @@ class _HomeHeaderCard extends StatelessWidget {
                                 : Image.asset(
                                     category.imagePath,
                                     fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.home_repair_service_outlined,
+                                      color: Color(0xFF909090),
+                                      size: 24,
+                                    ),
                                   ),
                           ),
                           const SizedBox(height: 8),
                           Text(
                             category.label,
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -798,8 +969,14 @@ class _FilterChipWidget extends StatelessWidget {
 
 class _WorkerListTile extends StatelessWidget {
   final Worker worker;
+  final String travelFeeLabel;
+  final VoidCallback onFavoriteTap;
 
-  const _WorkerListTile({required this.worker});
+  const _WorkerListTile({
+    required this.worker,
+    required this.travelFeeLabel,
+    required this.onFavoriteTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -845,7 +1022,7 @@ class _WorkerListTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'LKR ${worker.price} • Travel fee LKR ${worker.travelFee.toStringAsFixed(0)} • ${worker.travelMinutes} min',
+                  '$travelFeeLabel • ${worker.travelMinutes} min',
                   style: const TextStyle(
                     fontSize: 10.5,
                     color: Color(0xFF8A8A8A),
@@ -881,10 +1058,15 @@ class _WorkerListTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(
-            worker.isFavorite ? Icons.favorite : Icons.favorite_border_rounded,
-            color: worker.isFavorite ? Colors.redAccent : Colors.black45,
-            size: 28,
+          GestureDetector(
+            onTap: onFavoriteTap,
+            child: Icon(
+              worker.isFavorite
+                  ? Icons.favorite
+                  : Icons.favorite_border_rounded,
+              color: worker.isFavorite ? Colors.redAccent : Colors.black45,
+              size: 28,
+            ),
           ),
         ],
       ),
@@ -894,8 +1076,14 @@ class _WorkerListTile extends StatelessWidget {
 
 class _WorkerCard extends StatelessWidget {
   final Worker worker;
+  final String travelFeeLabel;
+  final VoidCallback onFavoriteTap;
 
-  const _WorkerCard({required this.worker});
+  const _WorkerCard({
+    required this.worker,
+    required this.travelFeeLabel,
+    required this.onFavoriteTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -909,28 +1097,52 @@ class _WorkerCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 105,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8EAF3),
-              borderRadius: BorderRadius.circular(18),
-              image: worker.profilePhotoUrl.isNotEmpty
-                  ? DecorationImage(
-                      image: NetworkImage(worker.profilePhotoUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
-            ),
-            child: worker.profilePhotoUrl.isEmpty
-                ? const Center(
+          Stack(
+            children: [
+              Container(
+                height: 105,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EAF3),
+                  borderRadius: BorderRadius.circular(18),
+                  image: worker.profilePhotoUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(worker.profilePhotoUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: worker.profilePhotoUrl.isEmpty
+                    ? const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 42,
+                          color: Color(0xFF677082),
+                        ),
+                      )
+                    : null,
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: onFavoriteTap,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.white,
                     child: Icon(
-                      Icons.person,
-                      size: 42,
-                      color: Color(0xFF677082),
+                      worker.isFavorite
+                          ? Icons.favorite
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: worker.isFavorite
+                          ? Colors.redAccent
+                          : Colors.black45,
                     ),
-                  )
-                : null,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Text(
@@ -950,7 +1162,7 @@ class _WorkerCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Fee LKR ${worker.travelFee.toStringAsFixed(0)} • ${worker.travelMinutes} min',
+            '$travelFeeLabel • ${worker.travelMinutes} min',
             style: const TextStyle(fontSize: 10.5, color: Color(0xFF8A8A8A)),
           ),
           const Spacer(),
@@ -965,10 +1177,10 @@ class _WorkerCard extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'LKR ${worker.price}',
+                  '${worker.distanceKm.toStringAsFixed(1)} km',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
@@ -986,12 +1198,20 @@ class _WorkerCard extends StatelessWidget {
 
 class _OfferTile extends StatelessWidget {
   final Worker worker;
+  final String travelFeeLabel;
+  final VoidCallback onFavoriteTap;
 
-  const _OfferTile({required this.worker});
+  const _OfferTile({
+    required this.worker,
+    required this.travelFeeLabel,
+    required this.onFavoriteTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final oldPrice = worker.oldPrice ?? worker.price;
+    final offerBadge = worker.offerType == 'free_travel'
+        ? 'FREE TRAVEL'
+        : 'OFFER';
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1032,30 +1252,16 @@ class _OfferTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Text(
-                      'LKR ${worker.price}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.redAccent,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'LKR $oldPrice',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        decoration: TextDecoration.lineThrough,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '$travelFeeLabel • ${worker.travelMinutes} min',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF8A8A8A),
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}',
+                  '${worker.distanceKm.toStringAsFixed(1)} km away',
                   style: const TextStyle(
                     fontSize: 10.5,
                     color: Color(0xFF8A8A8A),
@@ -1064,20 +1270,38 @@ class _OfferTile extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE5E5),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'OFFER',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: Colors.redAccent,
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE5E5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  offerBadge,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.redAccent,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: onFavoriteTap,
+                child: Icon(
+                  worker.isFavorite
+                      ? Icons.favorite
+                      : Icons.favorite_border_rounded,
+                  color: worker.isFavorite ? Colors.redAccent : Colors.black45,
+                  size: 24,
+                ),
+              ),
+            ],
           ),
         ],
       ),

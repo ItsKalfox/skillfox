@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'customer_home_screen.dart';
-import 'customer_community_feed_screen.dart';
-import 'customer_search_screen.dart';
-import 'customer_bookings_screen.dart';
-import 'customer_profile_screen.dart';
+import '../home/customer_home_screen.dart';
+import '../community/customer_community_feed_screen.dart';
+import '../search/customer_search_screen.dart';
+import '../bookings/customer_bookings_screen.dart';
+import '../profile/customer_profile_screen.dart';
 
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
