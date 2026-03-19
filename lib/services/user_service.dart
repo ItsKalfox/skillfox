@@ -32,4 +32,15 @@ class UserService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
+
+  Future<void> updateProfilePhoto(String photoUrl) async {
+    final uid = currentUid;
+    if (uid == null) return;
+
+    await _userRef(uid).update({
+      'profilePhotoUrl': photoUrl,
+      'profileImageUrl': photoUrl,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

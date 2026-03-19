@@ -1,13 +1,14 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../models/worker.dart';
+
+import '../../../core/utils/week_helper.dart';
 import '../../../models/user_address.dart';
+import '../../../models/worker.dart';
+import '../../../services/address_service.dart';
+import '../../../services/favorite_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/worker_service.dart';
-import '../../../services/favorite_service.dart';
-import '../../../services/address_service.dart';
-import '../../../core/utils/week_helper.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
 
@@ -48,13 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _CategoryData(label: 'Caregiver', imagePath: 'assets/icons/caregiver.png'),
     _CategoryData(label: 'Mason', imagePath: 'assets/icons/mason.png'),
     _CategoryData(label: 'Handyman', imagePath: 'assets/icons/handyman.png'),
-    _CategoryData(label: 'Painter', imagePath: 'assets/icons/painter.png'),
-    _CategoryData(label: 'Gardener', imagePath: 'assets/icons/gardener.png'),
-    _CategoryData(label: 'Driver', imagePath: 'assets/icons/driver.png'),
-    _CategoryData(
-      label: 'IT Support',
-      imagePath: 'assets/icons/it_support.png',
-    ),
   ];
 
   @override
@@ -515,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 8),
                               _buildListPreview(featured, 2),
-                              const SizedBox(height: 22),
+                              const SizedBox(height: 26),
                               _SectionHeader(
                                 title: 'Book again',
                                 onSeeAll: () {
@@ -532,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 10),
                               _buildGridPreview(bookAgain, 4),
-                              const SizedBox(height: 22),
+                              const SizedBox(height: 26),
                               _SectionHeader(
                                 title: 'Workers near you',
                                 onSeeAll: () {
@@ -549,7 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 8),
                               _buildListPreview(nearby, 2),
-                              const SizedBox(height: 22),
+                              const SizedBox(height: 26),
                               _SectionHeader(
                                 title: "Today's offers",
                                 onSeeAll: () {
@@ -566,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 8),
                               _buildOfferPreview(offers, 2),
-                              const SizedBox(height: 22),
+                              const SizedBox(height: 26),
                               _SectionHeader(
                                 title: 'Highest rated',
                                 onSeeAll: () {
@@ -613,7 +607,7 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _FilterChipWidget(
             label: 'Under 30 min',
             icon: Icons.access_time,
@@ -624,7 +618,7 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _FilterChipWidget(
             label: 'Highest rated',
             icon: Icons.person_search_outlined,
@@ -885,9 +879,10 @@ class _SectionHeader extends StatelessWidget {
           child: Text(
             title,
             style: const TextStyle(
-              fontSize: 15,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF222222),
+              letterSpacing: 0.2,
+              color: Color(0xFF1A1A1A),
             ),
           ),
         ),
@@ -929,35 +924,40 @@ class _FilterChipWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEAE6FF) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          color: selected ? const Color(0xFF6F5CFF) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF7B61FF) : const Color(0xFFE6E8F0),
+            color: selected ? const Color(0xFF6F5CFF) : const Color(0xFFE6E8F0),
           ),
+          boxShadow: [
+            if (!selected)
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
-              size: 16,
-              color: selected
-                  ? const Color(0xFF6F5CFF)
-                  : const Color(0xFF666666),
+              size: 14,
+              color: selected ? Colors.white : const Color(0xFF666666),
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                color: selected
-                    ? const Color(0xFF6F5CFF)
-                    : const Color(0xFF444444),
+                fontSize: 11.5,
                 fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : const Color(0xFF444444),
               ),
             ),
           ],
@@ -1006,7 +1006,7 @@ class _WorkerListTile extends StatelessWidget {
                 Text(
                   worker.name,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF222222),
                   ),
@@ -1093,6 +1093,13 @@ class _WorkerCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFEAECEF)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1150,7 +1157,7 @@ class _WorkerCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 13.5,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
               color: Color(0xFF222222),
             ),
@@ -1158,12 +1165,12 @@ class _WorkerCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             worker.category,
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFF8A8A8A)),
+            style: const TextStyle(fontSize: 12, color: Color(0xFF8A8A8A)),
           ),
           const SizedBox(height: 4),
           Text(
             '$travelFeeLabel • ${worker.travelMinutes} min',
-            style: const TextStyle(fontSize: 10.5, color: Color(0xFF8A8A8A)),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF8A8A8A)),
           ),
           const Spacer(),
           Row(
@@ -1173,7 +1180,7 @@ class _WorkerCard extends StatelessWidget {
               Text(
                 worker.rating.toStringAsFixed(1),
                 style: const TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -1183,7 +1190,7 @@ class _WorkerCard extends StatelessWidget {
                   '${worker.distanceKm.toStringAsFixed(1)} km',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Color(0xFF8A8A8A),
                   ),
                 ),

@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'personal_info_screen.dart';
-import 'security_screen.dart';
 import 'privacy_data_screen.dart';
+import 'security_screen.dart';
 
 class ManageAccountScreen extends StatelessWidget {
   const ManageAccountScreen({super.key});
@@ -13,22 +13,50 @@ class ManageAccountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    if (user == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF4F6FB),
+        body: Center(
+          child: Text(
+            'No user signed in',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc(user!.uid)
+            .doc(user.uid)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Failed to load account info: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
 
-          String name = data['name'] ?? 'Customer User';
-          String email = data['email'] ?? 'No email available';
+          final data = snapshot.data?.data();
+
+          final String name = (data?['name'] ?? 'Customer User').toString();
+          final String email = (data?['email'] ?? 'No email available')
+              .toString();
+          final String profilePhotoUrl =
+              (data?['profilePhotoUrl'] ?? data?['profileImageUrl'] ?? '')
+                  .toString();
 
           return Column(
             children: [
@@ -83,22 +111,25 @@ class ManageAccountScreen extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                       child: Column(
                         children: [
-                          const CircleAvatar(
+                          CircleAvatar(
                             radius: 52,
                             backgroundColor: Colors.white,
                             child: CircleAvatar(
                               radius: 48,
-                              backgroundColor: Color(0xFFE9EDF5),
-                              child: Icon(
-                                Icons.person,
-                                size: 46,
-                                color: Color(0xFF6B7280),
-                              ),
+                              backgroundColor: const Color(0xFFE9EDF5),
+                              backgroundImage: profilePhotoUrl.isNotEmpty
+                                  ? NetworkImage(profilePhotoUrl)
+                                  : null,
+                              child: profilePhotoUrl.isEmpty
+                                  ? const Icon(
+                                      Icons.person,
+                                      size: 46,
+                                      color: Color(0xFF6B7280),
+                                    )
+                                  : null,
                             ),
                           ),
                           const SizedBox(height: 14),
-
-                          /// NAME FROM FIREBASE
                           Text(
                             name,
                             textAlign: TextAlign.center,
@@ -108,10 +139,7 @@ class ManageAccountScreen extends StatelessWidget {
                               color: Color(0xFF111111),
                             ),
                           ),
-
                           const SizedBox(height: 4),
-
-                          /// EMAIL FROM FIREBASE
                           Text(
                             email,
                             textAlign: TextAlign.center,
@@ -121,9 +149,7 @@ class ManageAccountScreen extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-
                           const SizedBox(height: 28),
-
                           Row(
                             children: [
                               Expanded(
