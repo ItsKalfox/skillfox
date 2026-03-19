@@ -76,6 +76,7 @@ class _CustomerSignup2ScreenState extends State<CustomerSignup2Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
@@ -94,7 +95,7 @@ class _CustomerSignup2ScreenState extends State<CustomerSignup2Screen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -205,7 +206,7 @@ class _CustomerSignup2ScreenState extends State<CustomerSignup2Screen> {
                                   ],
                                 ),
                               ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 28),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -213,14 +214,14 @@ class _CustomerSignup2ScreenState extends State<CustomerSignup2Screen> {
                                 GestureDetector(
                                   onTap: _onNext,
                                   child: Container(
-                                    width: 56, height: 56,
+                                    width: 70, height: 70,
                                     decoration: const BoxDecoration(
                                       gradient: AppColors.mainGradient,
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(
-                                      Icons.arrow_forward,
-                                      color: Colors.white, size: 24,
+                                      Icons.arrow_forward_rounded,
+                                      color: Colors.white, size: 30,
                                     ),
                                   ),
                                 ),
@@ -234,6 +235,13 @@ class _CustomerSignup2ScreenState extends State<CustomerSignup2Screen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

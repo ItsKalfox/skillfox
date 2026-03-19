@@ -20,6 +20,7 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
@@ -37,7 +38,7 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -75,7 +76,7 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
                             const SizedBox(height: 14),
                             AppTextField(placeholder: 'Phone Number', controller: _phoneCtrl,
                               keyboardType: TextInputType.phone, validator: Validators.phone),
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 240),
                             Align(
                               alignment: Alignment.centerRight,
                               child: GestureDetector(
@@ -90,11 +91,11 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
                                   }
                                 },
                                 child: Container(
-                                  width: 56, height: 56,
+                                  width: 70, height: 70,
                                   decoration: const BoxDecoration(
                                     gradient: AppColors.mainGradient, shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(Icons.arrow_forward, color: Colors.white, size: 24),
+                                  child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 30),
                                 ),
                               ),
                             ),
@@ -107,6 +108,13 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

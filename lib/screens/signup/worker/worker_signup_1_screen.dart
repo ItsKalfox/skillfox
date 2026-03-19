@@ -27,6 +27,7 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
@@ -84,7 +85,7 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                             const SizedBox(height: 22),
                             AppTextField(placeholder: 'National ID', controller: _idCtrl,
                               validator: (v) => Validators.required(v, 'National ID')),
-                            const SizedBox(height: 50),
+                            const SizedBox(height: 40),
                             // Arrow button
                             Align(
                               alignment: Alignment.centerRight,

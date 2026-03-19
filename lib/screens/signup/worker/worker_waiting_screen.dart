@@ -37,6 +37,7 @@ class _WorkerWaitingScreenState extends State<WorkerWaitingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
@@ -114,6 +115,13 @@ class _WorkerWaitingScreenState extends State<WorkerWaitingScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],

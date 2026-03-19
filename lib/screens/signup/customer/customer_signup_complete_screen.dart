@@ -26,6 +26,7 @@ class _CustomerSignupCompleteScreenState extends State<CustomerSignupCompleteScr
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),

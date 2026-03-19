@@ -16,6 +16,7 @@ class _SignupTypeScreenState extends State<SignupTypeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
 

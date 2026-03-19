@@ -87,6 +87,7 @@ class _WorkerSignup4ScreenState extends State<WorkerSignup4Screen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
@@ -104,7 +105,7 @@ class _WorkerSignup4ScreenState extends State<WorkerSignup4Screen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
                       child: Form(
                         key: _formKey,
                         child: Column(
@@ -277,6 +278,13 @@ class _WorkerSignup4ScreenState extends State<WorkerSignup4Screen> {
                   ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset(
+              'assets/images/bottom-line.png',
+              fit: BoxFit.fitWidth,
             ),
           ),
         ],
