@@ -64,7 +64,10 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA), 
       appBar: AppBar(
-        title: const Text('Community', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: 0.5)),
+        iconTheme: const IconThemeData(
+          color: Colors.white, 
+        ),
+        title: const Text('Community', style: TextStyle(color: Colors.white,fontWeight: FontWeight.w800, fontSize: 24, letterSpacing: 0.5)),
         centerTitle: true, 
         backgroundColor: Colors.transparent, 
         elevation: 0, 
