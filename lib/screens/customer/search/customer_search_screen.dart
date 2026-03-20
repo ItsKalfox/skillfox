@@ -261,8 +261,9 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('users')
-                  .snapshots(),
+    .collection('users')
+    .where('role', isEqualTo: 'worker') // 🔥 ONLY WORKERS
+    .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -349,7 +350,7 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen> {
                               ],
                             ),
                             Text(
-                              '${(w["distance"] as double).toStringAsFixed(1)} km',
+                              '${(w["distance"] ?? 0).toDouble().toStringAsFixed(1)} km',
                               style: const TextStyle(fontSize: 10),
                             ),
                           ],
