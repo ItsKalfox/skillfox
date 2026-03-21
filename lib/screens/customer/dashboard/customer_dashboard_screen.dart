@@ -17,13 +17,14 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentIndex = 0;
 
   // For now all tabs use same screen
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    CustomerCommunityFeedScreen(),
-    CustomerSearchScreen(),
-    CustomerBookingsScreen(),
-    CustomerProfileScreen(),
+  final List<Widget> _screens = [
+    const HomeScreen(),
+    const CustomerCommunityFeedScreen(),
+    const CustomerSearchScreen(),
+    const CustomerBookingsScreen(),
+    const CustomerProfileScreen(),
   ];
+
 
   @override
   Widget build(BuildContext context) {
