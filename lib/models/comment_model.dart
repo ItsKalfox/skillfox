@@ -1,11 +1,11 @@
 class CommentModel {
   final String id;
   final String postId;
-  final String userId; 
+  final String userId;
   final String username;
   final String text;
   final String date;
-  final String? parentId; 
+  final String? parentId;
 
   CommentModel({
     required this.id,
@@ -33,7 +33,7 @@ class CommentModel {
     return CommentModel(
       id: map['id'] ?? '',
       postId: map['postId'] ?? '',
-      userId: map['userId'] ?? 'unknown_user', 
+      userId: map['userId'] ?? 'unknown_user',
       username: map['username'] ?? 'Anonymous',
       text: map['text'] ?? '',
       date: map['date'] ?? '',

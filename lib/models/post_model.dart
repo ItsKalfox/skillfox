@@ -7,7 +7,7 @@ class PostModel {
   final String category;
   final String description;
   final String mediaUrl;
-  final String mediaType; 
+  final String mediaType;
   final List<dynamic> likedBy;
   final List<dynamic> savedBy;
   final List<dynamic> reportedBy;
@@ -21,7 +21,7 @@ class PostModel {
     required this.category,
     required this.description,
     required this.mediaUrl,
-    required this.mediaType, 
+    required this.mediaType,
     required this.likedBy,
     required this.savedBy,
     required this.reportedBy,
@@ -37,7 +37,7 @@ class PostModel {
       'category': category,
       'description': description,
       'mediaUrl': mediaUrl,
-      'mediaType': mediaType, 
+      'mediaType': mediaType,
       'likedBy': likedBy,
       'savedBy': savedBy,
       'reportedBy': reportedBy,
@@ -54,8 +54,7 @@ class PostModel {
       category: map['category'] ?? 'General',
       description: map['description'] ?? '',
       mediaUrl: map['mediaUrl'] ?? '',
-      
-      mediaType: map['mediaType'] ?? 'image', 
+      mediaType: map['mediaType'] ?? 'image',
       likedBy: map['likedBy'] ?? [],
       savedBy: map['savedBy'] ?? [],
       reportedBy: map['reportedBy'] ?? [],
