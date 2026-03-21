@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../home/customer_details_screen.dart';
+
 class WorkerHomeScreen extends StatefulWidget {
   const WorkerHomeScreen({super.key});
 
@@ -89,7 +91,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 
   void _listenToNearbyRequests(Position position) {
-    // Listen to pending service requests
     _requestSubscription = _firestore
         .collection('service_requests')
         .where('status', isEqualTo: 'pending')
@@ -103,7 +104,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             return data;
           }).toList();
 
-          // Filter by distance (within 10km)
           final nearby = requests.where((req) {
             final lat = req['customerLat'] as double?;
             final lng = req['customerLng'] as double?;
@@ -115,7 +115,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               lat,
               lng,
             );
-            return distance <= 10000; // 10km
+            return distance <= 10000;
           }).toList();
 
           setState(() {
@@ -128,7 +128,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   void _buildMarkers(Position myPos, List<Map<String, dynamic>> requests) {
     final markers = <Marker>{};
 
-    // My location marker
     markers.add(
       Marker(
         markerId: const MarkerId('my_location'),
@@ -138,7 +137,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       ),
     );
 
-    // Customer request markers
     for (final req in requests) {
       final lat = req['customerLat'] as double?;
       final lng = req['customerLng'] as double?;
@@ -238,6 +236,22 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     return '${(dist / 1000).toStringAsFixed(1)}km away';
   }
 
+  /// Navigate to CustomerDetailScreen and handle accept/decline result
+  void _openCustomerDetail(Map<String, dynamic> request) async {
+    final requestId = request['id'] as String;
+
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => CustomerDetailScreen(request: request)),
+    );
+
+    if (result == 'accepted') {
+      await _acceptRequest(requestId, request);
+    } else if (result == 'declined') {
+      await _declineRequest(requestId, request);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingProfile) {
@@ -256,7 +270,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       backgroundColor: const Color(0xFFF2F4FA),
       body: CustomScrollView(
         slivers: [
-          // ── App Bar with cover + avatar ──
           SliverToBoxAdapter(
             child: _buildProfileHeader(
               name: name,
@@ -268,7 +281,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             ),
           ),
 
-          // ── Stats row ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -280,7 +292,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             ),
           ),
 
-          // ── Nearby Requests header ──
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
@@ -403,7 +414,11 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                     final request = _nearbyRequests[index];
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: _buildRequestCard(request),
+                      // ✅ Tap the card → go to CustomerDetailScreen
+                      child: GestureDetector(
+                        onTap: () => _openCustomerDetail(request),
+                        child: _buildRequestCard(request),
+                      ),
                     );
                   }, childCount: _nearbyRequests.length),
                 ),
@@ -426,11 +441,11 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        // Cover + gradient
+        // Cover gradient
         Container(
           height: 220,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
               colors: [Color(0xFF5AA4F6), Color(0xFF4B7DF3)],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -489,7 +504,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // White card below
+        // White card curve
         Positioned(
           top: 160,
           left: 0,
@@ -503,7 +518,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // Profile avatar (overlapping)
+        // Profile avatar
         Positioned(
           top: 110,
           child: Container(
@@ -525,7 +540,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // Name, category, rating
+        // ✅ Name → Category → Stars (all three, in order)
         Positioned(
           top: 215,
           left: 0,
@@ -540,15 +555,17 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                   color: Color(0xFF1A1A2E),
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                category,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF8A8A8A),
-                  fontWeight: FontWeight.w500,
+              const SizedBox(height: 4),
+              // ── CATEGORY (shown between name and stars) ──
+              if (category.isNotEmpty)
+                Text(
+                  category,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF4B7DF3),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
               const SizedBox(height: 4),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -569,8 +586,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // Spacer so content starts below
-        const SizedBox(height: 330),
+        const SizedBox(height: 340),
       ],
     );
   }
@@ -623,7 +639,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 
   Widget _buildRequestCard(Map<String, dynamic> request) {
-    final requestId = request['id'] as String;
     final customerName = request['customerName'] ?? 'Customer';
     final serviceType = request['serviceType'] ?? 'Service Request';
     final customerPhoto = request['customerPhotoUrl'] ?? '';
@@ -742,45 +757,23 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
           const SizedBox(height: 14),
 
+          // ✅ Tap hint chevron
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Decline button
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _declineRequest(requestId, request),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Decline',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
+              Text(
+                'Tap to view details',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey.shade400,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(width: 12),
-              // Accept button
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _acceptRequest(requestId, request),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4B7DF3),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Accept',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 16,
+                color: Colors.grey.shade400,
               ),
             ],
           ),
