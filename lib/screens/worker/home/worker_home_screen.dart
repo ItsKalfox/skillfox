@@ -1,15 +1,9 @@
-import 'package:flutter/gestures.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import '../../../models/worker.dart';
-import '../../../models/user_address.dart';
-import '../../../services/location_service.dart';
-import '../../../services/worker_service.dart';
-import '../../../services/favorite_service.dart';
-import '../../../services/address_service.dart';
-import '../../../core/utils/week_helper.dart';
-import '../profile/addresses/addresses_screen.dart';
-import 'section_workers_screen.dart';
 
 class WorkerHomeScreen extends StatefulWidget {
   const WorkerHomeScreen({super.key});
@@ -19,1179 +13,772 @@ class WorkerHomeScreen extends StatefulWidget {
 }
 
 class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
-  final LocationService _locationService = LocationService();
-  final WorkerService _workerService = WorkerService();
-  final FavoriteService _favoriteService = FavoriteService();
-  final AddressService _addressService = AddressService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String selectedCategory = 'All';
-  bool offersOnly = false;
-  bool under30Min = false;
-  bool highestRatedOnly = false;
+  GoogleMapController? _mapController;
+  Position? _currentPosition;
+  Map<String, dynamic>? _workerData;
+  bool _isLoadingProfile = true;
 
-  Future<Position?>? _locationFuture;
-
-  UserAddress? _selectedAddress;
-  String _selectedAddressLabel = 'Home';
-  bool _isLoadingDefaultAddress = true;
-
-  final List<_CategoryData> categories = const [
-    _CategoryData(label: 'All', imagePath: ''),
-    _CategoryData(label: 'Mechanic', imagePath: 'assets/icons/mechanic.png'),
-    _CategoryData(label: 'Teacher', imagePath: 'assets/icons/teacher.png'),
-    _CategoryData(label: 'Plumber', imagePath: 'assets/icons/plumber.png'),
-    _CategoryData(
-      label: 'Electrician',
-      imagePath: 'assets/icons/electrician.png',
-    ),
-    _CategoryData(label: 'Cleaner', imagePath: 'assets/icons/cleaner.png'),
-    _CategoryData(label: 'Caregiver', imagePath: 'assets/icons/caregiver.png'),
-    _CategoryData(label: 'Mason', imagePath: 'assets/icons/mason.png'),
-    _CategoryData(label: 'Handyman', imagePath: 'assets/icons/handyman.png'),
-    _CategoryData(label: 'Painter', imagePath: 'assets/icons/painter.png'),
-    _CategoryData(label: 'Gardener', imagePath: 'assets/icons/gardener.png'),
-    _CategoryData(label: 'Driver', imagePath: 'assets/icons/driver.png'),
-    _CategoryData(
-      label: 'IT Support',
-      imagePath: 'assets/icons/it_support.png',
-    ),
-  ];
+  Set<Marker> _markers = {};
+  List<Map<String, dynamic>> _nearbyRequests = [];
+  StreamSubscription? _requestSubscription;
 
   @override
   void initState() {
     super.initState();
-    _locationFuture = _locationService.getCurrentLocation();
-    _loadDefaultAddress();
+    _loadWorkerProfile();
+    _getCurrentLocation();
   }
 
-  Future<void> _loadDefaultAddress() async {
-    final defaultAddress = await _addressService.getDefaultAddress();
+  @override
+  void dispose() {
+    _requestSubscription?.cancel();
+    _mapController?.dispose();
+    super.dispose();
+  }
 
+  Future<void> _loadWorkerProfile() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final doc = await _firestore.collection('users').doc(uid).get();
     if (!mounted) return;
 
     setState(() {
-      _selectedAddress = defaultAddress;
-      _selectedAddressLabel =
-          (defaultAddress != null && defaultAddress.label.isNotEmpty)
-          ? defaultAddress.label
-          : 'Home';
-      _isLoadingDefaultAddress = false;
+      _workerData = doc.data();
+      _isLoadingProfile = false;
     });
   }
 
-  Future<void> _openAddresses() async {
-    final result = await Navigator.push<UserAddress>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            WorkerAddressesScreen(selectedAddress: _selectedAddress),
+  Future<void> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever) return;
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+      });
+
+      _updateWorkerLocation(position);
+      _listenToNearbyRequests(position);
+    } catch (e) {
+      debugPrint('Location error: $e');
+    }
+  }
+
+  Future<void> _updateWorkerLocation(Position position) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    await _firestore.collection('users').doc(uid).update({
+      'lat': position.latitude,
+      'lng': position.longitude,
+      'lastLocationUpdate': FieldValue.serverTimestamp(),
+    });
+  }
+
+  void _listenToNearbyRequests(Position position) {
+    // Listen to pending service requests
+    _requestSubscription = _firestore
+        .collection('service_requests')
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted) return;
+
+          final requests = snapshot.docs.map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            return data;
+          }).toList();
+
+          // Filter by distance (within 10km)
+          final nearby = requests.where((req) {
+            final lat = req['customerLat'] as double?;
+            final lng = req['customerLng'] as double?;
+            if (lat == null || lng == null) return false;
+
+            final distance = Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              lat,
+              lng,
+            );
+            return distance <= 10000; // 10km
+          }).toList();
+
+          setState(() {
+            _nearbyRequests = nearby;
+            _buildMarkers(position, nearby);
+          });
+        });
+  }
+
+  void _buildMarkers(Position myPos, List<Map<String, dynamic>> requests) {
+    final markers = <Marker>{};
+
+    // My location marker
+    markers.add(
+      Marker(
+        markerId: const MarkerId('my_location'),
+        position: LatLng(myPos.latitude, myPos.longitude),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        infoWindow: const InfoWindow(title: 'You are here'),
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        _selectedAddress = result;
-        _selectedAddressLabel = result.label.isEmpty ? 'Home' : result.label;
-      });
-    }
-  }
+    // Customer request markers
+    for (final req in requests) {
+      final lat = req['customerLat'] as double?;
+      final lng = req['customerLng'] as double?;
+      if (lat == null || lng == null) continue;
 
-  List<Worker> applyFilters(List<Worker> workers) {
-    var filtered = workers;
-
-    if (selectedCategory != 'All') {
-      filtered = filtered
-          .where(
-            (worker) =>
-                worker.category.toLowerCase() == selectedCategory.toLowerCase(),
-          )
-          .toList();
-    }
-
-    if (offersOnly) {
-      filtered = filtered.where((worker) => worker.hasOffer).toList();
-    }
-
-    if (under30Min) {
-      filtered = filtered
-          .where((worker) => worker.travelMinutes <= 30)
-          .toList();
-    }
-
-    if (highestRatedOnly) {
-      filtered = filtered.where((worker) => worker.rating >= 4.8).toList();
-    }
-
-    return filtered;
-  }
-
-  void resetFilters() {
-    setState(() {
-      selectedCategory = 'All';
-      offersOnly = false;
-      under30Min = false;
-      highestRatedOnly = false;
-    });
-  }
-
-  void _showFeesInfoSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      markers.add(
+        Marker(
+          markerId: MarkerId(req['id']),
+          position: LatLng(lat, lng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(
+            title: req['customerName'] ?? 'Customer',
+            snippet: req['serviceType'] ?? '',
           ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD9D9D9),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Varies based on distance and service requirements.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF222222),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Divider(height: 1, color: Color(0xFFE8E8E8)),
-                const SizedBox(height: 16),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Travel Fee',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF222222),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Varies based on your location, the worker’s distance, traffic conditions, and availability in your area.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Inspection Fee',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF222222),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Varies depending on the type of service and whether an on-site assessment is required before starting the job.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      height: 1.4,
-                      color: Color(0xFF666666),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  String _travelFeeLabel(Worker worker) {
-    if (worker.hasOffer && worker.offerType == 'free_travel') {
-      return 'Travel fee LKR 0';
-    }
-    return 'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoadingDefaultAddress) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_selectedAddress?.location != null) {
-      final selectedLocation = _selectedAddress!.location!;
-
-      return _buildHomeContent(
-        customerLat: selectedLocation.latitude,
-        customerLng: selectedLocation.longitude,
+        ),
       );
     }
 
-    return FutureBuilder<Position?>(
-      future: _locationFuture,
-      builder: (context, locationSnapshot) {
-        if (locationSnapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        final customerPosition = locationSnapshot.data;
-
-        if (customerPosition == null) {
-          return const Scaffold(
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Location permission is required to show nearby workers and travel fees.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          );
-        }
-
-        return _buildHomeContent(
-          customerLat: customerPosition.latitude,
-          customerLng: customerPosition.longitude,
-        );
-      },
-    );
+    setState(() {
+      _markers = markers;
+    });
   }
 
-  Widget _buildHomeContent({
-    required double customerLat,
-    required double customerLng,
-  }) {
-    return StreamBuilder<List<Worker>>(
-      stream: _workerService.getWorkersForCustomerLocation(
-        customerLat: customerLat,
-        customerLng: customerLng,
-      ),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+  Future<void> _acceptRequest(
+    String requestId,
+    Map<String, dynamic> request,
+  ) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
 
-        if (snapshot.hasError) {
-          return Scaffold(
-            body: Center(child: Text('Error: ${snapshot.error}')),
-          );
-        }
+    try {
+      await _firestore.collection('service_requests').doc(requestId).update({
+        'status': 'accepted',
+        'workerId': uid,
+        'workerName': _workerData?['name'] ?? '',
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
 
-        final allWorkers = snapshot.data ?? [];
-
-        return StreamBuilder<Set<String>>(
-          stream: _favoriteService.getFavoriteWorkerIds(),
-          builder: (context, favoriteSnapshot) {
-            final favoriteIds = favoriteSnapshot.data ?? <String>{};
-
-            final workersWithFavorites = allWorkers.map((worker) {
-              return Worker(
-                id: worker.id,
-                name: worker.name,
-                category: worker.category,
-                rating: worker.rating,
-                ratingCount: worker.ratingCount,
-                completedJobsCount: worker.completedJobsCount,
-                distanceKm: worker.distanceKm,
-                travelMinutes: worker.travelMinutes,
-                travelFee: worker.travelFee,
-                hasOffer: worker.hasOffer,
-                offerType: worker.offerType,
-                isFeatured: worker.isFeatured,
-                featuredWeekKey: worker.featuredWeekKey,
-                isFavorite: favoriteIds.contains(worker.id),
-                profilePhotoUrl: worker.profilePhotoUrl,
-                address: worker.address,
-                lat: worker.lat,
-                lng: worker.lng,
-                about: worker.about, // ✅ add this
-                experience: worker.experience, // ✅ add this
-                certification: worker.certification, // ✅ add this
-                isAvailable: worker.isAvailable, // ✅ add this
-                services: worker.services,
-              );
-            }).toList();
-
-            final currentWeek = getCurrentWeekKey();
-
-            final featured = applyFilters(
-              workersWithFavorites
-                  .where(
-                    (worker) =>
-                        worker.isFeatured &&
-                        worker.featuredWeekKey == currentWeek,
-                  )
-                  .toList(),
-            );
-
-            final bookAgain = applyFilters(const <Worker>[]);
-
-            final nearby = applyFilters(
-              workersWithFavorites
-                  .where((worker) => worker.distanceKm <= 10)
-                  .toList()
-                ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm)),
-            );
-
-            final offers = applyFilters(
-              workersWithFavorites.where((worker) => worker.hasOffer).toList(),
-            );
-
-            final highestRated = applyFilters(
-              [...workersWithFavorites]
-                ..sort((a, b) => b.rating.compareTo(a.rating)),
-            ).where((worker) => worker.rating >= 4.8).toList();
-
-            final categoryListResults = applyFilters(
-              [...workersWithFavorites]
-                ..sort((a, b) => a.travelMinutes.compareTo(b.travelMinutes)),
-            );
-
-            final bool isCategoryMode = selectedCategory != 'All';
-
-            return SafeArea(
-              child: Scaffold(
-                body: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 140),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HomeHeaderCard(
-                        categories: categories,
-                        selectedCategory: selectedCategory,
-                        onCategoryTap: (category) {
-                          setState(() {
-                            selectedCategory = category;
-                          });
-                        },
-                        titleText: _selectedAddressLabel,
-                        onAddressTap: _openAddresses,
-                      ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _buildFilterRow(),
-                      ),
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isCategoryMode) ...[
-                              Row(
-                                children: [
-                                  Text(
-                                    '${categoryListResults.length} results',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: Color(0xFF555555),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  GestureDetector(
-                                    onTap: resetFilters,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F1F1),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: const Text(
-                                        'Reset',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF444444),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              if (categoryListResults.isEmpty)
-                                const _EmptySectionText(
-                                  text: 'No workers found for this category',
-                                )
-                              else
-                                ...categoryListResults.map(
-                                  (worker) => _WorkerListTile(
-                                    worker: worker,
-                                    travelFeeLabel: _travelFeeLabel(worker),
-                                    onFavoriteTap: () =>
-                                        _favoriteService.toggleFavorite(
-                                          worker.id,
-                                          worker.isFavorite,
-                                        ),
-                                  ),
-                                ),
-                            ] else ...[
-                              RichText(
-                                text: TextSpan(
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF666666),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  children: [
-                                    const TextSpan(
-                                      text: 'Additional fees may apply. ',
-                                    ),
-                                    TextSpan(
-                                      text: 'Learn more',
-                                      style: const TextStyle(
-                                        color: Color(0xFF222222),
-                                        fontWeight: FontWeight.w600,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                      recognizer: TapGestureRecognizer()
-                                        ..onTap = _showFeesInfoSheet,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              _SectionHeader(
-                                title: 'Featured on SkillFox',
-                                onSeeAll: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: 'Featured on SkillFox',
-                                        workers: featured,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              _buildListPreview(featured, 2),
-                              const SizedBox(height: 22),
-                              _SectionHeader(
-                                title: 'Book again',
-                                onSeeAll: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: 'Book again',
-                                        workers: bookAgain,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 10),
-                              _buildGridPreview(bookAgain, 4),
-                              const SizedBox(height: 22),
-                              _SectionHeader(
-                                title: 'Workers near you',
-                                onSeeAll: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: 'Workers near you',
-                                        workers: nearby,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              _buildListPreview(nearby, 2),
-                              const SizedBox(height: 22),
-                              _SectionHeader(
-                                title: "Today's offers",
-                                onSeeAll: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: "Today's offers",
-                                        workers: offers,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              _buildOfferPreview(offers, 2),
-                              const SizedBox(height: 22),
-                              _SectionHeader(
-                                title: 'Highest rated',
-                                onSeeAll: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: 'Highest rated',
-                                        workers: highestRated,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 8),
-                              _buildListPreview(highestRated, 2),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildFilterRow() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _FilterChipWidget(
-            label: 'Offers',
-            icon: Icons.local_offer_outlined,
-            selected: offersOnly,
-            onTap: () {
-              setState(() {
-                offersOnly = !offersOnly;
-              });
-            },
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Request from ${request['customerName'] ?? 'Customer'} accepted!',
           ),
-          const SizedBox(width: 10),
-          _FilterChipWidget(
-            label: 'Under 30 min',
-            icon: Icons.access_time,
-            selected: under30Min,
-            onTap: () {
-              setState(() {
-                under30Min = !under30Min;
-              });
-            },
-          ),
-          const SizedBox(width: 10),
-          _FilterChipWidget(
-            label: 'Highest rated',
-            icon: Icons.person_search_outlined,
-            selected: highestRatedOnly,
-            onTap: () {
-              setState(() {
-                highestRatedOnly = !highestRatedOnly;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildListPreview(List<Worker> workers, int count) {
-    if (workers.isEmpty) {
-      return const _EmptySectionText();
-    }
-
-    final preview = workers.take(count).toList();
-    return Column(
-      children: preview
-          .map(
-            (worker) => _WorkerListTile(
-              worker: worker,
-              travelFeeLabel: _travelFeeLabel(worker),
-              onFavoriteTap: () =>
-                  _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildOfferPreview(List<Worker> workers, int count) {
-    if (workers.isEmpty) {
-      return const _EmptySectionText();
-    }
-
-    final preview = workers.take(count).toList();
-    return Column(
-      children: preview
-          .map(
-            (worker) => _OfferTile(
-              worker: worker,
-              travelFeeLabel: _travelFeeLabel(worker),
-              onFavoriteTap: () =>
-                  _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildGridPreview(List<Worker> workers, int count) {
-    if (workers.isEmpty) {
-      return const _EmptySectionText();
-    }
-
-    final preview = workers.take(count).toList();
-
-    return GridView.builder(
-      itemCount: preview.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.83,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      ),
-      itemBuilder: (_, index) => _WorkerCard(
-        worker: preview[index],
-        travelFeeLabel: _travelFeeLabel(preview[index]),
-        onFavoriteTap: () => _favoriteService.toggleFavorite(
-          preview[index].id,
-          preview[index].isFavorite,
+          backgroundColor: const Color(0xFF22C55E),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to accept: $e')));
+    }
   }
-}
 
-class _CategoryData {
-  final String label;
-  final String imagePath;
+  Future<void> _declineRequest(
+    String requestId,
+    Map<String, dynamic> request,
+  ) async {
+    try {
+      await _firestore.collection('service_requests').doc(requestId).update({
+        'status': 'declined',
+        'declinedAt': FieldValue.serverTimestamp(),
+      });
 
-  const _CategoryData({required this.label, required this.imagePath});
-}
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Request from ${request['customerName'] ?? 'Customer'} declined.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to decline: $e')));
+    }
+  }
 
-class _HomeHeaderCard extends StatelessWidget {
-  final List<_CategoryData> categories;
-  final String selectedCategory;
-  final ValueChanged<String> onCategoryTap;
-  final String titleText;
-  final VoidCallback onAddressTap;
+  String _distanceLabel(Map<String, dynamic> request) {
+    if (_currentPosition == null) return '';
+    final lat = request['customerLat'] as double?;
+    final lng = request['customerLng'] as double?;
+    if (lat == null || lng == null) return '';
 
-  const _HomeHeaderCard({
-    required this.categories,
-    required this.selectedCategory,
-    required this.onCategoryTap,
-    required this.titleText,
-    required this.onAddressTap,
-  });
+    final dist = Geolocator.distanceBetween(
+      _currentPosition!.latitude,
+      _currentPosition!.longitude,
+      lat,
+      lng,
+    );
+
+    if (dist < 1000) return '${dist.toStringAsFixed(0)}m away';
+    return '${(dist / 1000).toStringAsFixed(1)}km away';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF5AA4F6), Color(0xFF4B7DF3)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: onAddressTap,
-                  child: Row(
-                    children: [
-                      Text(
-                        titleText,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Colors.white,
-                  size: 21,
-                ),
-              ],
+    if (_isLoadingProfile) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final name = _workerData?['name'] ?? 'Worker';
+    final category = _workerData?['category'] ?? '';
+    final rating = (_workerData?['rating'] ?? 0.0).toDouble();
+    final profilePhoto = _workerData?['profilePhotoUrl'] ?? '';
+    final coverPhoto = _workerData?['coverPhotoUrl'] ?? '';
+    final isAvailable = _workerData?['isAvailable'] ?? false;
+    final completedJobs = _workerData?['completedJobsCount'] ?? 0;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F4FA),
+      body: CustomScrollView(
+        slivers: [
+          // ── App Bar with cover + avatar ──
+          SliverToBoxAdapter(
+            child: _buildProfileHeader(
+              name: name,
+              category: category,
+              rating: rating,
+              profilePhoto: profilePhoto,
+              coverPhoto: coverPhoto,
+              isAvailable: isAvailable,
             ),
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF7F7FA),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(24),
-                bottom: Radius.circular(30),
+
+          // ── Stats row ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildStatsRow(
+                completedJobs: completedJobs,
+                nearbyCount: _nearbyRequests.length,
+                isAvailable: isAvailable,
               ),
             ),
-            child: SizedBox(
-              height: 98,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (context, index) {
-                  final category = categories[index];
-                  final bool isSelected = selectedCategory == category.label;
+          ),
 
-                  return GestureDetector(
-                    onTap: () => onCategoryTap(category.label),
-                    child: SizedBox(
-                      width: 72,
+          // ── Nearby Requests header ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+              child: Row(
+                children: [
+                  const Text(
+                    'Nearby Requests',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF0FF),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 7,
+                          height: 7,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF4B7DF3),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${_nearbyRequests.length} pending',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF4B7DF3),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Map ──
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  height: 220,
+                  child: _currentPosition == null
+                      ? Container(
+                          color: const Color(0xFFE8EAF3),
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      : GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: LatLng(
+                              _currentPosition!.latitude,
+                              _currentPosition!.longitude,
+                            ),
+                            zoom: 13,
+                          ),
+                          markers: _markers,
+                          onMapCreated: (controller) {
+                            _mapController = controller;
+                          },
+                          myLocationEnabled: false,
+                          zoomControlsEnabled: false,
+                          mapToolbarEnabled: false,
+                        ),
+                ),
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+          // ── Customer request list ──
+          _nearbyRequests.isEmpty
+              ? SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 24,
+                    ),
+                    child: Center(
                       child: Column(
                         children: [
-                          Container(
-                            width: 58,
-                            height: 58,
-                            padding: EdgeInsets.all(
-                              category.label == 'All' ? 0 : 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFFEFF3FF)
-                                  : const Color(0xFFF3F3F6),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF6B8EFF)
-                                    : const Color(0xFFE1E3EA),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: category.label == 'All'
-                                ? Icon(
-                                    Icons.grid_view_rounded,
-                                    size: 24,
-                                    color: isSelected
-                                        ? const Color(0xFF5C7FFF)
-                                        : const Color(0xFF909090),
-                                  )
-                                : Image.asset(
-                                    category.imagePath,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.home_repair_service_outlined,
-                                      color: Color(0xFF909090),
-                                      size: 24,
-                                    ),
-                                  ),
+                          Icon(
+                            Icons.inbox_outlined,
+                            size: 48,
+                            color: Colors.grey.shade300,
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            category.label,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.center,
+                          const SizedBox(height: 10),
+                          const Text(
+                            'No nearby requests right now',
                             style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w500,
-                              color: isSelected
-                                  ? const Color(0xFF5C7FFF)
-                                  : const Color(0xFF444444),
+                              color: Color(0xFF8A8A8A),
+                              fontSize: 14,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
+                  ),
+                )
+              : SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final request = _nearbyRequests[index];
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: _buildRequestCard(request),
+                    );
+                  }, childCount: _nearbyRequests.length),
+                ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
     );
   }
-}
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final VoidCallback onSeeAll;
-
-  const _SectionHeader({required this.title, required this.onSeeAll});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+  Widget _buildProfileHeader({
+    required String name,
+    required String category,
+    required double rating,
+    required String profilePhoto,
+    required String coverPhoto,
+    required bool isAvailable,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
       children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF222222),
+        // Cover + gradient
+        Container(
+          height: 220,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF5AA4F6), Color(0xFF4B7DF3)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: coverPhoto.isNotEmpty
+              ? Image.network(
+                  coverPhoto,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  color: Colors.black.withOpacity(0.25),
+                  colorBlendMode: BlendMode.darken,
+                )
+              : null,
+        ),
+
+        // Top bar
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  const Text(
+                    'Home',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: Colors.white,
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        GestureDetector(
-          onTap: onSeeAll,
+
+        // White card below
+        Positioned(
+          top: 160,
+          left: 0,
+          right: 0,
           child: Container(
-            width: 34,
-            height: 34,
+            height: 120,
             decoration: const BoxDecoration(
-              color: Color(0xFFF1F1F1),
+              color: Color(0xFFF2F4FA),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+          ),
+        ),
+
+        // Profile avatar (overlapping)
+        Positioned(
+          top: 110,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF2F4FA),
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 15,
-              color: Color(0xFF666666),
+            child: CircleAvatar(
+              radius: 48,
+              backgroundColor: const Color(0xFFE6EAF7),
+              backgroundImage: profilePhoto.isNotEmpty
+                  ? NetworkImage(profilePhoto)
+                  : null,
+              child: profilePhoto.isEmpty
+                  ? const Icon(Icons.person, size: 48, color: Color(0xFF5B6475))
+                  : null,
             ),
+          ),
+        ),
+
+        // Name, category, rating
+        Positioned(
+          top: 215,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                category,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF8A8A8A),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
+                  const SizedBox(width: 4),
+                  Text(
+                    rating.toStringAsFixed(1),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Spacer so content starts below
+        const SizedBox(height: 330),
+      ],
+    );
+  }
+
+  Widget _buildStatsRow({
+    required int completedJobs,
+    required int nearbyCount,
+    required bool isAvailable,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            icon: Icons.list_alt_rounded,
+            value: completedJobs.toString(),
+            label: 'Requests',
+            iconColor: const Color(0xFF4B7DF3),
+            bgColor: const Color(0xFFEEF0FF),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.near_me_rounded,
+            value: nearbyCount.toString(),
+            label: 'Within 5km',
+            iconColor: const Color(0xFF22C55E),
+            bgColor: const Color(0xFFEAFBF0),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _StatCard(
+            icon: Icons.check_circle_outline_rounded,
+            value: isAvailable ? 'Active' : 'Offline',
+            label: 'Status',
+            iconColor: isAvailable
+                ? const Color(0xFF22C55E)
+                : const Color(0xFF8A8A8A),
+            bgColor: isAvailable
+                ? const Color(0xFFEAFBF0)
+                : const Color(0xFFF0F0F0),
+            valueColor: isAvailable
+                ? const Color(0xFF22C55E)
+                : const Color(0xFF8A8A8A),
           ),
         ),
       ],
     );
   }
-}
 
-class _FilterChipWidget extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
+  Widget _buildRequestCard(Map<String, dynamic> request) {
+    final requestId = request['id'] as String;
+    final customerName = request['customerName'] ?? 'Customer';
+    final serviceType = request['serviceType'] ?? 'Service Request';
+    final customerPhoto = request['customerPhotoUrl'] ?? '';
+    final description = request['description'] ?? '';
+    final distLabel = _distanceLabel(request);
+    final timestamp = request['createdAt'] as Timestamp?;
+    final timeAgo = timestamp != null ? _timeAgo(timestamp.toDate()) : '';
 
-  const _FilterChipWidget({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: selected ? const Color(0xFFEAE6FF) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: selected ? const Color(0xFF7B61FF) : const Color(0xFFE6E8F0),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: selected
-                  ? const Color(0xFF6F5CFF)
-                  : const Color(0xFF666666),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: selected
-                    ? const Color(0xFF6F5CFF)
-                    : const Color(0xFF444444),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _WorkerListTile extends StatelessWidget {
-  final Worker worker;
-  final String travelFeeLabel;
-  final VoidCallback onFavoriteTap;
-
-  const _WorkerListTile({
-    required this.worker,
-    required this.travelFeeLabel,
-    required this.onFavoriteTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 27,
-            backgroundColor: const Color(0xFFE6EAF7),
-            backgroundImage: worker.profilePhotoUrl.isNotEmpty
-                ? NetworkImage(worker.profilePhotoUrl)
-                : null,
-            child: worker.profilePhotoUrl.isEmpty
-                ? const Icon(Icons.person, size: 28, color: Color(0xFF5B6475))
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  worker.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF222222),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  worker.category,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF8A8A8A),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$travelFeeLabel • ${worker.travelMinutes} min',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 16,
-                      color: Colors.amber,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      worker.rating.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${worker.distanceKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF8A8A8A),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onFavoriteTap,
-            child: Icon(
-              worker.isFavorite
-                  ? Icons.favorite
-                  : Icons.favorite_border_rounded,
-              color: worker.isFavorite ? Colors.redAccent : Colors.black45,
-              size: 28,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WorkerCard extends StatelessWidget {
-  final Worker worker;
-  final String travelFeeLabel;
-  final VoidCallback onFavoriteTap;
-
-  const _WorkerCard({
-    required this.worker,
-    required this.travelFeeLabel,
-    required this.onFavoriteTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFEAECEF)),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
+          Row(
             children: [
-              Container(
-                height: 105,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8EAF3),
-                  borderRadius: BorderRadius.circular(18),
-                  image: worker.profilePhotoUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(worker.profilePhotoUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: worker.profilePhotoUrl.isEmpty
-                    ? const Center(
-                        child: Icon(
-                          Icons.person,
-                          size: 42,
-                          color: Color(0xFF677082),
-                        ),
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: const Color(0xFFE6EAF7),
+                backgroundImage: customerPhoto.isNotEmpty
+                    ? NetworkImage(customerPhoto)
+                    : null,
+                child: customerPhoto.isEmpty
+                    ? const Icon(
+                        Icons.person,
+                        size: 24,
+                        color: Color(0xFF5B6475),
                       )
                     : null,
               ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: onFavoriteTap,
-                  child: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      worker.isFavorite
-                          ? Icons.favorite
-                          : Icons.favorite_border_rounded,
-                      size: 18,
-                      color: worker.isFavorite
-                          ? Colors.redAccent
-                          : Colors.black45,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customerName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A2E),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      serviceType,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF4B7DF3),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (distLabel.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F4FA),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        distLabel,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF555555),
+                        ),
+                      ),
+                    ),
+                  if (timeAgo.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      timeAgo,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF8A8A8A),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Text(
-            worker.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF222222),
+
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF555555),
+                height: 1.4,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            worker.category,
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFF8A8A8A)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$travelFeeLabel • ${worker.travelMinutes} min',
-            style: const TextStyle(fontSize: 10.5, color: Color(0xFF8A8A8A)),
-          ),
-          const Spacer(),
+          ],
+
+          const SizedBox(height: 14),
+
           Row(
             children: [
-              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-              const SizedBox(width: 4),
-              Text(
-                worker.rating.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
+              // Decline button
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _declineRequest(requestId, request),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Decline',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
+              // Accept button
               Expanded(
-                child: Text(
-                  '${worker.distanceKm.toStringAsFixed(1)} km',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF8A8A8A),
+                child: ElevatedButton(
+                  onPressed: () => _acceptRequest(requestId, request),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4B7DF3),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Accept',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                   ),
                 ),
               ),
@@ -1201,139 +788,64 @@ class _WorkerCard extends StatelessWidget {
       ),
     );
   }
+
+  String _timeAgo(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
 }
 
-class _OfferTile extends StatelessWidget {
-  final Worker worker;
-  final String travelFeeLabel;
-  final VoidCallback onFavoriteTap;
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color iconColor;
+  final Color bgColor;
+  final Color? valueColor;
 
-  const _OfferTile({
-    required this.worker,
-    required this.travelFeeLabel,
-    required this.onFavoriteTap,
+  const _StatCard({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.iconColor,
+    required this.bgColor,
+    this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final offerBadge = worker.offerType == 'free_travel'
-        ? 'FREE TRAVEL'
-        : 'OFFER';
-
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 27,
-            backgroundColor: const Color(0xFFE6EAF7),
-            backgroundImage: worker.profilePhotoUrl.isNotEmpty
-                ? NetworkImage(worker.profilePhotoUrl)
-                : null,
-            child: worker.profilePhotoUrl.isEmpty
-                ? const Icon(Icons.person, size: 28, color: Color(0xFF5B6475))
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  worker.name,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  worker.category,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '$travelFeeLabel • ${worker.travelMinutes} min',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${worker.distanceKm.toStringAsFixed(1)} km away',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF8A8A8A),
-                  ),
-                ),
-              ],
+          Icon(icon, color: iconColor, size: 22),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: valueColor ?? const Color(0xFF1A1A2E),
             ),
           ),
-          Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE5E5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  offerBadge,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.redAccent,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              GestureDetector(
-                onTap: onFavoriteTap,
-                child: Icon(
-                  worker.isFavorite
-                      ? Icons.favorite
-                      : Icons.favorite_border_rounded,
-                  color: worker.isFavorite ? Colors.redAccent : Colors.black45,
-                  size: 24,
-                ),
-              ),
-            ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF8A8A8A),
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _EmptySectionText extends StatelessWidget {
-  final String text;
-
-  const _EmptySectionText({this.text = 'No workers found for this section'});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Color(0xFF8A8A8A),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
       ),
     );
   }

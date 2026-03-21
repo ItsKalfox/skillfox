@@ -41,6 +41,13 @@ class UserService {
     });
   }
 
+  Future<void> updateProfilePhoto(String photoUrl) async {
+    final uid = currentUid;
+    if (uid == null) return;
+
+    await _userRef(uid).update({'profilePhotoUrl': photoUrl});
+  }
+
   Future<void> updateWorkerInfo({
     required String name,
     required String phone,
