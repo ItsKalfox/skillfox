@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../home/customer_home_screen.dart';
 import '../community/customer_community_feed_screen.dart';
 import '../search/customer_search_screen.dart';
 import '../bookings/customer_bookings_screen.dart';
 import '../profile/customer_profile_screen.dart';
+import '../../../services/location_service.dart';
+import '../../../models/user_address.dart';
+import '../../../services/address_service.dart';
 
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
@@ -16,21 +20,70 @@ class CustomerDashboardScreen extends StatefulWidget {
 class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   int _currentIndex = 0;
 
-  // For now all tabs use same screen
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const CustomerCommunityFeedScreen(),
-    const CustomerSearchScreen(),
-    const CustomerBookingsScreen(),
-    const CustomerProfileScreen(),
-  ];
+  final LocationService _locationService = LocationService();
+  final AddressService _addressService = AddressService();
 
+  double? _customerLat;
+  double? _customerLng;
+  bool _locationLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveLocation();
+  }
+
+  Future<void> _resolveLocation() async {
+    // 1️⃣ Try default saved address first
+    final UserAddress? defaultAddress =
+        await _addressService.getDefaultAddress();
+
+    if (defaultAddress?.location != null) {
+      setState(() {
+        _customerLat = defaultAddress!.location!.latitude;
+        _customerLng = defaultAddress.location!.longitude;
+        _locationLoaded = true;
+      });
+      return;
+    }
+
+    // 2️⃣ Fall back to GPS
+    final Position? position = await _locationService.getCurrentLocation();
+
+    setState(() {
+      _customerLat = position?.latitude;
+      _customerLng = position?.longitude;
+      _locationLoaded = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading until location is resolved
+    if (!_locationLoaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Fallback coords (Colombo) if location is unavailable
+    final double lat = _customerLat ?? 6.9271;
+    final double lng = _customerLng ?? 79.8612;
+
+    final List<Widget> screens = [
+      const HomeScreen(),
+      const CustomerCommunityFeedScreen(),
+      CustomerSearchScreen(
+        customerLat: lat,
+        customerLng: lng,
+      ),
+      const CustomerBookingsScreen(),
+      const CustomerProfileScreen(),
+    ];
+
     return Scaffold(
       extendBody: true,
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: SkillFoxBottomNavBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -84,7 +137,7 @@ class SkillFoxBottomNavBar extends StatelessWidget {
               ),
               const SizedBox(width: 12),
 
-              // search bar button
+              // Search bar button
               Expanded(
                 child: GestureDetector(
                   onTap: () => onTap(2),
