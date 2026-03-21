@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../core/utils/week_helper.dart';
@@ -374,228 +375,239 @@ class _HomeScreenState extends State<HomeScreen> {
 
             final bool isCategoryMode = selectedCategory != 'All';
 
-            return SafeArea(
-              child: Scaffold(
-                backgroundColor: const Color(0xFFF4F6FB),
-                body: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 140),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _HomeHeaderCard(
-                        categories: categories,
-                        selectedCategory: selectedCategory,
-                        onCategoryTap: (c) =>
-                            setState(() => selectedCategory = c),
-                        titleText: _selectedAddressLabel,
-                        onAddressTap: _openAddresses,
-                      ),
-                      const SizedBox(height: 10),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: _buildFilterRow(),
-                      ),
-                      const SizedBox(height: 18),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isCategoryMode) ...[
-                              Row(
-                                children: [
-                                  Text(
-                                    '${categoryListResults.length} result${categoryListResults.length == 1 ? '' : 's'}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF555555),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  GestureDetector(
-                                    onTap: resetFilters,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFEEF2FF),
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: const Text(
-                                        'Reset filters',
-                                        style: TextStyle(
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF4B7DF3),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              if (categoryListResults.isEmpty)
-                                const _EmptySectionText(
-                                  text: 'No workers found for this category',
-                                )
-                              else
-                                ...categoryListResults.map(
-                                  (worker) => _WorkerListTile(
-                                    worker: worker,
-                                    travelFeeLabel: _travelFeeLabel(worker),
-                                    onFavoriteTap: () =>
-                                        _favoriteService.toggleFavorite(
-                                          worker.id,
-                                          worker.isFavorite,
-                                        ),
-                                    onTap: () => _goToWorkerProfile(worker),
-                                  ),
-                                ),
-                            ] else ...[
-                              // Fees notice
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF0F4FF),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFD6E2FF),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Scaffold(
+                  backgroundColor: const Color(0xFFF4F6FB),
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 140),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _HomeHeaderCard(
+                          categories: categories,
+                          selectedCategory: selectedCategory,
+                          onCategoryTap: (c) =>
+                              setState(() => selectedCategory = c),
+                          titleText: _selectedAddressLabel,
+                          onAddressTap: _openAddresses,
+                        ),
+                        const SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: _buildFilterRow(),
+                        ),
+                        const SizedBox(height: 18),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (isCategoryMode) ...[
+                                Row(
                                   children: [
-                                    const Icon(
-                                      Icons.info_outline_rounded,
-                                      size: 15,
-                                      color: Color(0xFF4B7DF3),
+                                    Text(
+                                      '${categoryListResults.length} result${categoryListResults.length == 1 ? '' : 's'}',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF555555),
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: RichText(
-                                        text: TextSpan(
-                                          style: const TextStyle(
-                                            fontSize: 12.5,
-                                            color: Color(0xFF4B7DF3),
-                                            fontWeight: FontWeight.w500,
+                                    const Spacer(),
+                                    GestureDetector(
+                                      onTap: resetFilters,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFEEF2FF),
+                                          borderRadius: BorderRadius.circular(
+                                            20,
                                           ),
-                                          children: [
-                                            const TextSpan(
-                                              text:
-                                                  'Additional fees may apply. ',
-                                            ),
-                                            TextSpan(
-                                              text: 'Learn more',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w700,
-                                                decoration:
-                                                    TextDecoration.underline,
-                                              ),
-                                              recognizer: TapGestureRecognizer()
-                                                ..onTap = _showFeesInfoSheet,
-                                            ),
-                                          ],
+                                        ),
+                                        child: const Text(
+                                          'Reset filters',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF4B7DF3),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(height: 22),
+                                const SizedBox(height: 14),
+                                if (categoryListResults.isEmpty)
+                                  const _EmptySectionText(
+                                    text: 'No workers found for this category',
+                                  )
+                                else
+                                  ...categoryListResults.map(
+                                    (worker) => _WorkerListTile(
+                                      worker: worker,
+                                      travelFeeLabel: _travelFeeLabel(worker),
+                                      onFavoriteTap: () =>
+                                          _favoriteService.toggleFavorite(
+                                            worker.id,
+                                            worker.isFavorite,
+                                          ),
+                                      onTap: () => _goToWorkerProfile(worker),
+                                    ),
+                                  ),
+                              ] else ...[
+                                // Fees notice
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0F4FF),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFD6E2FF),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.info_outline_rounded,
+                                        size: 15,
+                                        color: Color(0xFF4B7DF3),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: RichText(
+                                          text: TextSpan(
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              color: Color(0xFF4B7DF3),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            children: [
+                                              const TextSpan(
+                                                text:
+                                                    'Additional fees may apply. ',
+                                              ),
+                                              TextSpan(
+                                                text: 'Learn more',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  decoration:
+                                                      TextDecoration.underline,
+                                                ),
+                                                recognizer:
+                                                    TapGestureRecognizer()
+                                                      ..onTap =
+                                                          _showFeesInfoSheet,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 22),
 
-                              _SectionHeader(
-                                title: 'Featured on SkillFox',
-                                onSeeAll: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SectionWorkersScreen(
-                                      title: 'Featured on SkillFox',
-                                      workers: featured,
+                                _SectionHeader(
+                                  title: 'Featured on SkillFox',
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SectionWorkersScreen(
+                                        title: 'Featured on SkillFox',
+                                        workers: featured,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              _buildListPreview(featured, 2),
-                              const SizedBox(height: 26),
+                                const SizedBox(height: 10),
+                                _buildListPreview(featured, 2),
+                                const SizedBox(height: 26),
 
-                              _SectionHeader(
-                                title: 'Book again',
-                                onSeeAll: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SectionWorkersScreen(
-                                      title: 'Book again',
-                                      workers: bookAgain,
+                                _SectionHeader(
+                                  title: 'Book again',
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SectionWorkersScreen(
+                                        title: 'Book again',
+                                        workers: bookAgain,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildGridPreview(bookAgain, 4),
-                              const SizedBox(height: 26),
+                                const SizedBox(height: 12),
+                                _buildGridPreview(bookAgain, 4),
+                                const SizedBox(height: 26),
 
-                              _SectionHeader(
-                                title: 'Workers near you',
-                                onSeeAll: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SectionWorkersScreen(
-                                      title: 'Workers near you',
-                                      workers: nearby,
+                                _SectionHeader(
+                                  title: 'Workers near you',
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SectionWorkersScreen(
+                                        title: 'Workers near you',
+                                        workers: nearby,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              _buildListPreview(nearby, 2),
-                              const SizedBox(height: 26),
+                                const SizedBox(height: 10),
+                                _buildListPreview(nearby, 2),
+                                const SizedBox(height: 26),
 
-                              _SectionHeader(
-                                title: "Today's offers",
-                                onSeeAll: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SectionWorkersScreen(
-                                      title: "Today's offers",
-                                      workers: offers,
+                                _SectionHeader(
+                                  title: "Today's offers",
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SectionWorkersScreen(
+                                        title: "Today's offers",
+                                        workers: offers,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              _buildOfferPreview(offers, 2),
-                              const SizedBox(height: 26),
+                                const SizedBox(height: 10),
+                                _buildOfferPreview(offers, 2),
+                                const SizedBox(height: 26),
 
-                              _SectionHeader(
-                                title: 'Highest rated',
-                                onSeeAll: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => SectionWorkersScreen(
-                                      title: 'Highest rated',
-                                      workers: highestRated,
+                                _SectionHeader(
+                                  title: 'Highest rated',
+                                  onSeeAll: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SectionWorkersScreen(
+                                        title: 'Highest rated',
+                                        workers: highestRated,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 10),
-                              _buildListPreview(highestRated, 2),
+                                const SizedBox(height: 10),
+                                _buildListPreview(highestRated, 2),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
+              ), // SafeArea
+            ); // AnnotatedRegion
           },
         );
       },
@@ -786,7 +798,7 @@ class _HomeHeaderCard extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF5AA4F6), Color(0xFF4B7DF3)],
+          colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -796,7 +808,12 @@ class _HomeHeaderCard extends StatelessWidget {
         children: [
           const SizedBox(height: 20),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            padding: EdgeInsets.fromLTRB(
+              18,
+              MediaQuery.of(context).padding.top + 18,
+              18,
+              14,
+            ),
             child: Row(
               children: [
                 GestureDetector(
