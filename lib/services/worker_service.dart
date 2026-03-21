@@ -70,6 +70,16 @@ class WorkerService {
                 id: doc.id,
                 name: (data['name'] ?? 'Unknown Worker').toString(),
                 category: (data['jobType'] ?? 'Unknown').toString(),
+                about: (data['about'] ?? '').toString(),
+                experience: (data['experience'] ?? '').toString(),
+                isAvailable: _toBool(data['isAvailable'], fallback: true),
+                services: data['services'] != null
+                    ? List<Map<String, dynamic>>.from(
+                        (data['services'] as List).map(
+                          (e) => Map<String, dynamic>.from(e),
+                        ),
+                      )
+                    : [],
                 rating: _toDouble(data['ratingAverage'], fallback: 4.5),
                 ratingCount: _toInt(data['ratingCount'], fallback: 0),
                 completedJobsCount: _toInt(
@@ -86,6 +96,7 @@ class WorkerService {
                 isFavorite: false,
                 profilePhotoUrl: (data['profilePhotoUrl'] ?? '').toString(),
                 address: (data['address'] ?? '').toString(),
+                certification: (data['certification'] ?? '').toString(),
               ),
             );
           }

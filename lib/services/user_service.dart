@@ -22,14 +22,42 @@ class UserService {
   Future<void> updatePersonalInfo({
     required String name,
     required String phone,
+    String? about,
+    String? certification,
+    String? experience,
+    bool? isAvailable,
+    List<Map<String, dynamic>>? services,
   }) async {
-    final uid = currentUid;
-    if (uid == null) return;
+    final userId = FirebaseAuth.instance.currentUser!.uid;
 
-    await _userRef(uid).update({
-      'name': name.trim(),
-      'phone': phone.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
+    await FirebaseFirestore.instance.collection('users').doc(userId).update({
+      'name': name,
+      'phone': phone,
+      'about': about,
+      'certification': certification,
+      'experience': experience,
+      'isAvailable': isAvailable,
+      'services': services,
     });
+  }
+
+  Future<void> updateWorkerInfo({
+    required String name,
+    required String phone,
+    required String about,
+    required String certification,
+    required String experience,
+    required bool isAvailable,
+    required List<Map<String, dynamic>> services,
+  }) async {
+    return updatePersonalInfo(
+      name: name,
+      phone: phone,
+      about: about,
+      certification: certification,
+      experience: experience,
+      isAvailable: isAvailable,
+      services: services,
+    );
   }
 }

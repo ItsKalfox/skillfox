@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/sign_in_screen.dart';
+import '../worker/dashboard/worker_dashboard_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -65,7 +66,28 @@ class DashboardScreen extends StatelessWidget {
                         ),
 
                         const SizedBox(height: 40),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const WorkerDashboardScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.home),
+                            label: const Text("Go to Worker Home"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
 
+                        const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
                           height: 50,

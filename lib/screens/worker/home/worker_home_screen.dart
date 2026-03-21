@@ -11,14 +11,14 @@ import '../../../core/utils/week_helper.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class WorkerHomeScreen extends StatefulWidget {
+  const WorkerHomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<WorkerHomeScreen> createState() => _WorkerHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   final LocationService _locationService = LocationService();
   final WorkerService _workerService = WorkerService();
   final FavoriteService _favoriteService = FavoriteService();
@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            CustomerAddressesScreen(selectedAddress: _selectedAddress),
+            WorkerAddressesScreen(selectedAddress: _selectedAddress),
       ),
     );
 
@@ -352,10 +352,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 isFavorite: favoriteIds.contains(worker.id),
                 profilePhotoUrl: worker.profilePhotoUrl,
                 address: worker.address,
-                about: worker.about,
-                experience: worker.experience,
-                certification: worker.certification,
-                isAvailable: worker.isAvailable,
+                lat: worker.lat,
+                lng: worker.lng,
+                about: worker.about, // ✅ add this
+                experience: worker.experience, // ✅ add this
+                certification: worker.certification, // ✅ add this
+                isAvailable: worker.isAvailable, // ✅ add this
                 services: worker.services,
               );
             }).toList();
