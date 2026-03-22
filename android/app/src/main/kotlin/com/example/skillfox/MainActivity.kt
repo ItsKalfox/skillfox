@@ -1,4 +1,4 @@
-package com.example.skillfox
+package testzenith.com
 
 import io.flutter.embedding.android.FlutterActivity
 
