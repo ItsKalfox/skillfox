@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'personal_info_screen.dart';
-import 'security_screen.dart';
 import 'privacy_data_screen.dart';
+import 'security_screen.dart';
 
 class ManageAccountScreen extends StatelessWidget {
   const ManageAccountScreen({super.key});
@@ -13,171 +13,380 @@ class ManageAccountScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    if (user == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF4F6FB),
+        body: Center(
+          child: Text(
+            'No user signed in',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FB),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc(user!.uid)
+            .doc(user.uid)
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF4B7DF3)),
+            );
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'Failed to load account info: ${snapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
 
-          String name = data['name'] ?? 'Customer User';
-          String email = data['email'] ?? 'No email available';
+          final data = snapshot.data?.data();
+
+          final String name = (data?['name'] ?? 'Customer User').toString();
+          final String email = (data?['email'] ?? 'No email available')
+              .toString();
+          final String profilePhotoUrl =
+              (data?['profilePhotoUrl'] ?? data?['profileImageUrl'] ?? '')
+                  .toString();
+          final String initials = name.trim().isNotEmpty
+              ? name.trim()[0].toUpperCase()
+              : '?';
 
           return Column(
             children: [
+              // ── Gradient Header ────────────────────────
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 92),
+                padding: const EdgeInsets.fromLTRB(16, 52, 16, 80),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [Color(0xFF4FA0F5), Color(0xFF4D7EF5)],
+                    colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: Row(
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const Expanded(
-                      child: Center(
-                        child: Text(
-                          'SkillFox account',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                    // Back button
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
                             color: Colors.white,
+                            size: 17,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 28),
+                    const Text(
+                      'SkillFox Account',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
                   ],
                 ),
               ),
+
+              // ── White body ─────────────────────────────
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(30),
-                    ),
-                  ),
-                  child: Transform.translate(
-                    offset: const Offset(0, -62),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      child: Column(
-                        children: [
-                          const CircleAvatar(
-                            radius: 52,
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                              radius: 48,
-                              backgroundColor: Color(0xFFE9EDF5),
-                              child: Icon(
-                                Icons.person,
-                                size: 46,
-                                color: Color(0xFF6B7280),
-                              ),
+                  decoration: const BoxDecoration(color: Color(0xFFF4F6FB)),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Blue top slice behind avatar
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        height: 62,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
                             ),
                           ),
-                          const SizedBox(height: 14),
-
-                          /// NAME FROM FIREBASE
-                          Text(
-                            name,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF111111),
-                            ),
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          /// EMAIL FROM FIREBASE
-                          Text(
-                            email,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF666666),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-
-                          const SizedBox(height: 28),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _AccountOptionCard(
-                                  icon: Icons.person,
-                                  title: 'Personal info',
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const CustomerPersonalInfoScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _AccountOptionCard(
-                                  icon: Icons.shield_outlined,
-                                  title: 'Security',
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const CustomerSecurityScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: _AccountOptionCard(
-                                  icon: Icons.lock_outline,
-                                  title: 'Privacy & data',
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            const CustomerPrivacyDataScreen(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
+
+                      // Main card
+                      Positioned.fill(
+                        top: 62,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF4F6FB),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(30),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Content
+                      SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
+                        child: Column(
+                          children: [
+                            // Avatar floating on the seam
+                            Transform.translate(
+                              offset: const Offset(0, -52),
+                              child: Column(
+                                children: [
+                                  // Avatar with ring
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 4,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF4B7DF3,
+                                          ).withOpacity(0.20),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: CircleAvatar(
+                                      radius: 48,
+                                      backgroundColor: const Color(0xFFE6EAF7),
+                                      backgroundImage:
+                                          profilePhotoUrl.isNotEmpty
+                                          ? NetworkImage(profilePhotoUrl)
+                                          : null,
+                                      child: profilePhotoUrl.isEmpty
+                                          ? Text(
+                                              initials,
+                                              style: const TextStyle(
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF4B7DF3),
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    name,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF1A1F2E),
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.mail_outline_rounded,
+                                        size: 13,
+                                        color: Color(0xFF9AA3B4),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        email,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: Color(0xFF9AA3B4),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 28),
+
+                                  // ── Section label ────────────────
+                                  const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 4,
+                                        bottom: 12,
+                                      ),
+                                      child: Text(
+                                        'ACCOUNT OPTIONS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF9AA3B4),
+                                          letterSpacing: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // ── Option Cards ─────────────────
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: _AccountOptionCard(
+                                          icon: Icons.person_outline_rounded,
+                                          iconColor: const Color(0xFF4B7DF3),
+                                          iconBg: const Color(0xFFEEF2FF),
+                                          title: 'Personal Info',
+                                          onTap: () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const CustomerPersonalInfoScreen(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _AccountOptionCard(
+                                          icon: Icons.shield_outlined,
+                                          iconColor: const Color(0xFF7C5CFC),
+                                          iconBg: const Color(0xFFF0EBFF),
+                                          title: 'Security',
+                                          onTap: () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const CustomerSecurityScreen(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: _AccountOptionCard(
+                                          icon: Icons.lock_outline_rounded,
+                                          iconColor: const Color(0xFF00897B),
+                                          iconBg: const Color(0xFFE0F4F1),
+                                          title: 'Privacy & Data',
+                                          onTap: () => Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  const CustomerPrivacyDataScreen(),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 24),
+
+                                  // ── Info tiles ───────────────────
+                                  const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 4,
+                                        bottom: 12,
+                                      ),
+                                      child: Text(
+                                        'ACCOUNT INFO',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF9AA3B4),
+                                          letterSpacing: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFFEAECEF),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.03),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        _InfoTile(
+                                          icon: Icons.person_outline_rounded,
+                                          label: 'Full Name',
+                                          value: name,
+                                        ),
+                                        const Divider(
+                                          height: 1,
+                                          indent: 58,
+                                          endIndent: 16,
+                                          color: Color(0xFFF0F2F8),
+                                        ),
+                                        _InfoTile(
+                                          icon: Icons.mail_outline_rounded,
+                                          label: 'Email Address',
+                                          value: email,
+                                          trailing: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 3,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFEEF2FF),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: const Text(
+                                              'Verified',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF4B7DF3),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -189,13 +398,20 @@ class ManageAccountScreen extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════
+//  Account Option Card
+// ═══════════════════════════════════════════════
 class _AccountOptionCard extends StatelessWidget {
   final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
   final String title;
   final VoidCallback onTap;
 
   const _AccountOptionCard({
     required this.icon,
+    required this.iconColor,
+    required this.iconBg,
     required this.title,
     required this.onTap,
   });
@@ -205,27 +421,105 @@ class _AccountOptionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 112,
+        height: 108,
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F8),
-          borderRadius: BorderRadius.circular(18),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFEAECEF)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 30, color: const Color(0xFF111827)),
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              child: Icon(icon, color: iconColor, size: 21),
+            ),
             const SizedBox(height: 10),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Color(0xFF222222),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1F2E),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  Info Tile
+// ═══════════════════════════════════════════════
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Widget? trailing;
+
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF4F6FB),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 17, color: const Color(0xFF9AA3B4)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9AA3B4),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1F2E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) trailing!,
+        ],
       ),
     );
   }
