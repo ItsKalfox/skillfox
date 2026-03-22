@@ -61,21 +61,45 @@ class ManageAccountScreen extends StatelessWidget {
           final String initials = name.trim().isNotEmpty
               ? name.trim()[0].toUpperCase()
               : '?';
+          final String coverPhotoUrl = (data?['coverPhotoUrl'] ?? '').toString();
 
-          return Column(
+          return Stack(
             children: [
-              // ── Gradient Header ────────────────────────
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 52, 16, 80),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 300, // Sufficient height to sit behind the rounded card
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: coverPhotoUrl.isEmpty ? const Color(0xFF5AA4F6) : null,
+                    gradient: coverPhotoUrl.isEmpty
+                        ? const LinearGradient(
+                            colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    image: coverPhotoUrl.isNotEmpty
+                        ? DecorationImage(
+                            image: NetworkImage(coverPhotoUrl),
+                            fit: BoxFit.cover,
+                            colorFilter: ColorFilter.mode(
+                              Colors.black.withOpacity(0.35),
+                              BlendMode.darken,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
-                child: Stack(
+              ),
+              Column(
+                children: [
+                  // ── Transparent Header ────────────────────────
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 52, 16, 80),
+                    child: Stack(
                   alignment: Alignment.center,
                   children: [
                     // Back button
@@ -115,27 +139,10 @@ class ManageAccountScreen extends StatelessWidget {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: const BoxDecoration(color: Color(0xFFF4F6FB)),
+                  decoration: const BoxDecoration(color: Colors.transparent),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // Blue top slice behind avatar
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: 62,
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                        ),
-                      ),
-
                       // Main card
                       Positioned.fill(
                         top: 62,
@@ -390,11 +397,13 @@ class ManageAccountScreen extends StatelessWidget {
                 ),
               ),
             ],
-          );
-        },
-      ),
-    );
-  }
+          ),
+         ],
+        );
+      },
+    ),
+  );
+ }
 }
 
 // ═══════════════════════════════════════════════

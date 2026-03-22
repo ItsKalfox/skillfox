@@ -25,13 +25,6 @@ class Worker {
   final double? lat;
   final double? lng;
 
-  // 🔥 NEW FIELDS
-  final String about;
-  final String experience;
-  final String certification;
-  final bool isAvailable;
-  final List<Map<String, dynamic>> services;
-
   const Worker({
     required this.id,
     required this.name,
@@ -51,12 +44,5 @@ class Worker {
     required this.address,
     this.lat,
     this.lng,
-
-    // 🔥 NEW REQUIRED PARAMS
-    required this.about,
-    required this.experience,
-    required this.certification,
-    required this.isAvailable,
-    required this.services,
   });
 }

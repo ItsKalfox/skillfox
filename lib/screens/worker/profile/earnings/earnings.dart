@@ -681,7 +681,6 @@ class _EarningsState extends State<Earnings> {
                       barTouchData: BarTouchData(
                         touchTooltipData: BarTouchTooltipData(
                           getTooltipColor: (_) => const Color(0xFF2D1B5E),
-                          tooltipRoundedRadius: 8,
                           getTooltipItem: (group, groupIndex, rod, rodIndex) {
                             return BarTooltipItem(
                               'Rs ${rod.toY.toStringAsFixed(0)}',

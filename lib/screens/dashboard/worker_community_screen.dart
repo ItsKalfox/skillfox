@@ -3,19 +3,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:skillfox/screens/community/community_feed_screen.dart';
 
-class CustomerCommunityFeedScreen extends StatefulWidget {
-  const CustomerCommunityFeedScreen({super.key});
+class WorkerCommunityScreen extends StatefulWidget {
+  const WorkerCommunityScreen({super.key});
 
   @override
-  State<CustomerCommunityFeedScreen> createState() =>
-      _CustomerCommunityFeedScreenState();
+  State<WorkerCommunityScreen> createState() => WorkerCommunityScreenState();
 }
 
-class _CustomerCommunityFeedScreenState
-    extends State<CustomerCommunityFeedScreen> {
+// Public State so DashboardScreen can access uid/username/category
+// via GlobalKey<WorkerCommunityScreenState>.
+class WorkerCommunityScreenState extends State<WorkerCommunityScreen> {
   String? _uid;
   String? _username;
+  String? _category;
   bool _loading = true;
+
+  // Exposed for the outer Scaffold's FAB
+  String? get uid => _uid;
+  String? get username => _username;
+  String? get category => _category;
 
   @override
   void initState() {
@@ -35,11 +41,14 @@ class _CustomerCommunityFeedScreenState
         .doc(user.uid)
         .get();
 
-    final name = (doc.data()?['name'] ?? '').toString().trim();
+    final data = doc.data() ?? {};
+    final name = (data['name'] ?? '').toString().trim();
+    final category = (data['category'] ?? '').toString().trim();
 
     setState(() {
       _uid = user.uid;
-      _username = name.isNotEmpty ? name : 'Customer';
+      _username = name.isNotEmpty ? name : 'Worker';
+      _category = category.isNotEmpty ? category : 'General';
       _loading = false;
     });
   }
@@ -61,7 +70,8 @@ class _CustomerCommunityFeedScreenState
     return CommunityFeedScreen(
       currentUserId: _uid!,
       currentUsername: _username!,
-      isWorker: false,
+      isWorker: true,
+      userCategory: _category,
     );
   }
 }

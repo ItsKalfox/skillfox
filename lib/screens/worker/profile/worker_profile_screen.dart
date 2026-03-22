@@ -10,6 +10,7 @@ import '../profile/manage_account/manage_account_screen.dart';
 import '../profile/support/about_screen.dart';
 import '../profile/support/help_screen.dart';
 import '../profile/earnings/earnings.dart';
+import '../profile/offers/worker_offer_screen.dart';
 
 class WorkerProfileScreen extends StatelessWidget {
   const WorkerProfileScreen({super.key});
@@ -116,6 +117,9 @@ class WorkerProfileScreen extends StatelessWidget {
                 ? data!['profileImageUrl'].toString().trim()
                 : (providerUser?['profilePhotoUrl'] ?? '').toString();
 
+            final String coverPhotoUrl =
+                (data?['coverPhotoUrl']?.toString().trim() ?? '');
+
             // First letter for avatar fallback
             final String initials = name.isNotEmpty
                 ? name.trim()[0].toUpperCase()
@@ -138,7 +142,6 @@ class WorkerProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Profile Hero Card ──────────────────
                   _ProfileHeroCard(
                     name: name,
                     email: email,
@@ -207,6 +210,18 @@ class WorkerProfileScreen extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) => const WorkerHelpScreen(),
+                          ),
+                        ),
+                      ),
+                      _SettingsTileData(
+                        icon: Icons.local_offer_outlined,
+                        iconColor: const Color(0xFFF59E0B),
+                        iconBg: const Color(0xFFFEF3C7),
+                        label: 'Special Offers',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WorkerOfferScreen(),
                           ),
                         ),
                       ),

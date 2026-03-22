@@ -41,6 +41,8 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
   File? _certificateImageFile;
   File? _selectedProfileImageFile;
   String _profilePhotoUrl = '';
+  File? _selectedCoverImageFile;
+  String _coverPhotoUrl = '';
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -84,6 +86,7 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
       _profilePhotoUrl =
           (user?['profilePhotoUrl'] ?? user?['profileImageUrl'] ?? '')
               .toString();
+      _coverPhotoUrl = (user?['coverPhotoUrl'] ?? '').toString();
 
       final rawServices = user?['services'];
       if (rawServices is List && rawServices.isNotEmpty) {
@@ -170,6 +173,62 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
     }
   }
 
+  Future<void> _pickCoverPhoto() async {
+    try {
+      final pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+      );
+      if (pickedFile == null) return;
+
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: pickedFile.path,
+        compressQuality: 85,
+        aspectRatio: const CropAspectRatio(ratioX: 16, ratioY: 9),
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Banner Photo',
+            toolbarColor: const Color(0xFF4B7DF3),
+            toolbarWidgetColor: Colors.white,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Crop Banner Photo',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      if (croppedFile == null) return;
+      setState(() => _selectedCoverImageFile = File(croppedFile.path));
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorSnack('Failed to pick cover image: $e');
+    }
+  }
+
+  Future<String?> _uploadCoverPhotoIfNeeded() async {
+    if (_selectedCoverImageFile == null) return _coverPhotoUrl;
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return null;
+    try {
+      setState(() => _isUploadingPhoto = true);
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('cover_photos')
+          .child('${currentUser.uid}.jpg');
+      await storageRef.putFile(_selectedCoverImageFile!);
+      final downloadUrl = await storageRef.getDownloadURL();
+      await _userService.updateCoverPhoto(downloadUrl);
+      return downloadUrl;
+    } catch (e) {
+      if (!mounted) return null;
+      _showErrorSnack('Failed to upload banner: $e');
+      return null;
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   Future<void> _pickCertificatePdf() async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -242,6 +301,7 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
 
     try {
       final uploadedPhotoUrl = await _uploadProfilePhotoIfNeeded();
+      final uploadedCoverUrl = await _uploadCoverPhotoIfNeeded();
 
       await _userService.updateWorkerInfo(
         name: name,
@@ -257,6 +317,7 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
 
       setState(() {
         if (uploadedPhotoUrl != null) _profilePhotoUrl = uploadedPhotoUrl;
+        if (uploadedCoverUrl != null) _coverPhotoUrl = uploadedCoverUrl;
       });
 
       _showSuccessSnack('Profile updated successfully');
@@ -317,6 +378,14 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
       return FileImage(_selectedProfileImageFile!);
     }
     if (_profilePhotoUrl.isNotEmpty) return NetworkImage(_profilePhotoUrl);
+    return null;
+  }
+
+  ImageProvider? _buildCoverImage() {
+    if (_selectedCoverImageFile != null) {
+      return FileImage(_selectedCoverImageFile!);
+    }
+    if (_coverPhotoUrl.isNotEmpty) return NetworkImage(_coverPhotoUrl);
     return null;
   }
 
@@ -386,8 +455,10 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
                 collapseMode: CollapseMode.pin,
                 background: _HeaderBanner(
                   profileImage: profileImage,
+                  coverImage: _buildCoverImage(),
                   isUploadingPhoto: _isUploadingPhoto,
                   onPickPhoto: _isUploadingPhoto ? null : _pickProfilePhoto,
+                  onPickCover: _isUploadingPhoto ? null : _pickCoverPhoto,
                 ),
               ),
             ),
@@ -743,115 +814,175 @@ class _WorkerPersonalInfoScreenState extends State<WorkerPersonalInfoScreen>
 // ═══════════════════════════════════════════════
 class _HeaderBanner extends StatelessWidget {
   final ImageProvider? profileImage;
+  final ImageProvider? coverImage;
   final bool isUploadingPhoto;
   final VoidCallback? onPickPhoto;
+  final VoidCallback? onPickCover;
 
   const _HeaderBanner({
     required this.profileImage,
+    required this.coverImage,
     required this.isUploadingPhoto,
     required this.onPickPhoto,
+    required this.onPickCover,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+      decoration: BoxDecoration(
+        color: coverImage == null ? const Color(0xFF5AA4F6) : null,
+        gradient: coverImage == null
+            ? const LinearGradient(
+                colors: [Color(0xFF5AA4F6), Color(0xFF3A6BE8)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        image: coverImage != null
+            ? DecorationImage(
+                image: coverImage!,
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.35),
+                  BlendMode.darken,
+                ),
+              )
+            : null,
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            const SizedBox(height: 8),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.35),
-                      width: 3,
-                    ),
-                  ),
-                ),
-                CircleAvatar(
-                  radius: 44,
-                  backgroundColor: Colors.white.withOpacity(0.22),
-                  backgroundImage: profileImage,
-                  child: profileImage == null
-                      ? const Icon(
-                          Icons.person_rounded,
-                          size: 44,
-                          color: Colors.white,
-                        )
-                      : null,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: GestureDetector(
-                    onTap: onPickPhoto,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+      child: Stack(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const SizedBox(height: 8),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.35),
+                            width: 3,
                           ),
-                        ],
+                        ),
                       ),
-                      child: isUploadingPhoto
-                          ? const Padding(
-                              padding: EdgeInsets.all(7),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Color(0xFF4B7DF3),
-                              ),
-                            )
-                          : const Icon(
-                              Icons.camera_alt_rounded,
-                              size: 16,
-                              color: Color(0xFF4B7DF3),
+                      CircleAvatar(
+                        radius: 44,
+                        backgroundColor: Colors.white.withOpacity(0.22),
+                        backgroundImage: profileImage,
+                        child: profileImage == null
+                            ? const Icon(
+                                Icons.person_rounded,
+                                size: 44,
+                                color: Colors.white,
+                              )
+                            : null,
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: GestureDetector(
+                          onTap: onPickPhoto,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.15),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
+                            child: isUploadingPhoto
+                                ? const Padding(
+                                    padding: EdgeInsets.all(7),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF4B7DF3),
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt_rounded,
+                                    size: 16,
+                                    color: Color(0xFF4B7DF3),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Personal Info',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.2,
                     ),
                   ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Manage your worker profile',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.75),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top > 0
+                ? MediaQuery.of(context).padding.top + 8
+                : 32,
+            right: 16,
+            child: GestureDetector(
+              onTap: onPickCover,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Personal Info',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      Icons.camera_enhance_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Banner',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              'Manage your worker profile',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.75),
-                fontSize: 12.5,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
