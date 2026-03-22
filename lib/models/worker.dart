@@ -13,6 +13,7 @@ class Worker {
 
   final bool hasOffer;
   final String offerType;
+  final String offerDetails;
 
   final bool isFeatured;
   final String featuredWeekKey;
@@ -42,6 +43,7 @@ class Worker {
     required this.isFavorite,
     required this.profilePhotoUrl,
     required this.address,
+    required this.offerDetails,
     this.lat,
     this.lng,
   });
