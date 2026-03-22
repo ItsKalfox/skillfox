@@ -35,35 +35,44 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen> {
   }
 
   Future<void> _loadWorkerMarkers() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('users').get();
+  Query query = FirebaseFirestore.instance
+      .collection('users')
+      .where('role', isEqualTo: 'worker');
 
-    final Set<Marker> markers = {};
+  // 🔥 FILTER BASED ON CATEGORY
+  if (selectedCategory != "All") {
+    query = query.where('jobType', isEqualTo: selectedCategory);
+  }
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data();
-      final loc = data["location"];
-      if (loc != null) {
-        markers.add(
-          Marker(
-            markerId: MarkerId(doc.id),
-            position: LatLng(loc.latitude, loc.longitude),
-            infoWindow: InfoWindow(
-              title: data["name"] ?? "Worker",
-              snippet: data["jobType"] ?? "",
-            ),
+  final snapshot = await query.get();
+
+  final Set<Marker> markers = {};
+
+  for (var doc in snapshot.docs) {
+    final data = doc.data() as Map<String, dynamic>;
+    final loc = data["location"];
+
+    if (loc != null) {
+      markers.add(
+        Marker(
+          markerId: MarkerId(doc.id),
+          position: LatLng(loc.latitude, loc.longitude),
+          infoWindow: InfoWindow(
+            title: data["name"] ?? "Worker",
+            snippet: data["jobType"] ?? "",
           ),
-        );
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _workerMarkers = markers;
-        _markersLoaded = true;
-      });
+        ),
+      );
     }
   }
+
+  if (mounted) {
+    setState(() {
+      _workerMarkers = markers;
+      _markersLoaded = true;
+    });
+  }
+}
 
   void _openFullMap() {
     Navigator.push(
@@ -121,10 +130,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen> {
                 _buildCategory("Caregiver", Icons.health_and_safety),
                 _buildCategory("Mason", Icons.construction),
                 _buildCategory("Handyman", Icons.handyman),
-                _buildCategory("Painter", Icons.format_paint),
-                _buildCategory("Gardener", Icons.local_florist),
-                _buildCategory("Driver", Icons.directions_car),
-                _buildCategory("IT Support", Icons.computer),
               ],
             ),
           ),
@@ -373,7 +378,14 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen> {
     return Padding(
       padding: const EdgeInsets.only(right: 10),
       child: GestureDetector(
-        onTap: () => setState(() => selectedCategory = label),
+        onTap: () {
+  setState(() {
+    selectedCategory = label;
+    _markersLoaded = false; // optional loading effect
+  });
+
+  _loadWorkerMarkers();
+},
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
