@@ -1,37 +1,26 @@
 {
   "project_info": {
-    "project_number": "226975244339",
-    "firebase_url": "https://zic500-default-rtdb.asia-southeast1.firebasedatabase.app",
-    "project_id": "zic500",
-    "storage_bucket": "zic500.appspot.com"
+    "project_number": "564390033293",
+    "project_id": "skillfox-dev",
+    "storage_bucket": "skillfox-dev.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:226975244339:android:0c9a031ea74f825c3fc346",
+        "mobilesdk_app_id": "1:564390033293:android:051e4e62b71c6b5984efc4",
         "android_client_info": {
-          "package_name": "testzenith.com"
+          "package_name": "com.example.skillfox"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "226975244339-dt3hl05l78b2qsf45r0b8kerscq4ggjq.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB0EPIyFEHIiutwPaUumhqtO84KwwRqeNs"
+          "current_key": "AIzaSyC5Smb3qCgtYgeIxud6_WRwPF9T_y8vgW4"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "226975244339-dt3hl05l78b2qsf45r0b8kerscq4ggjq.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import '../../../services/job_request_repository.dart';
+import '../requests/job_request_page.dart';
 import '../../../models/worker.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
@@ -12,6 +14,8 @@ class WorkerProfileScreen extends StatefulWidget {
 
 class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Worker get w => widget.worker;
+  static final JobRequestRepository _jobRequestRepository =
+      JobRequestRepository();
 
   // ── state ─────────────────────────────────────────────────────────
   Map<String, dynamic> _doc = {};
@@ -750,8 +754,22 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         child: SizedBox(
           height: 50,
           child: ElevatedButton(
-            onPressed: () => ScaffoldMessenger.of(ctx).showSnackBar(
-              const SnackBar(content: Text('Opening Request Service…')),
+            onPressed: () => Navigator.of(ctx).push(
+              MaterialPageRoute(
+                builder: (_) => JobRequestPage(
+                  repository: _jobRequestRepository,
+                  workerId: w.id,
+                  workerName: _name,
+                  workerCategory: _jobType,
+                  workerPhotoUrl: _photo,
+                  workerAddress: w.address,
+                  workerRating: _rating,
+                  distanceKm: w.distanceKm,
+                  services: _services
+                      .map((s) => {'name': s.name, 'price': s.price})
+                      .toList(),
+                ),
+              ),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,

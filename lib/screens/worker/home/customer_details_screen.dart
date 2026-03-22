@@ -280,7 +280,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                         height: 250,
                         child: GoogleMap(
                           initialCameraPosition: CameraPosition(
-                            target: LatLng(lat!, lng!),
+                            target: LatLng(lat, lng),
                             zoom: 15,
                           ),
                           markers: {

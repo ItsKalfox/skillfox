@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../services/job_request_repository.dart';
+import '../../customer/requests/job_request_page.dart';
 import '../../../models/worker.dart';
 
 // ═══════════════════════════════════════════════════════
@@ -14,6 +16,8 @@ class WorkerProfileScreen extends StatefulWidget {
 }
 
 class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
+  static final JobRequestRepository _jobRequestRepository =
+      JobRequestRepository();
   int _reviewPage = 0;
   static const int _perPage = 3;
 
@@ -511,9 +515,22 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 
   void _onRequest(BuildContext context) {
-    // TODO: hook into booking / job-request flow
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Opening Request Service…')),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => JobRequestPage(
+          repository: _jobRequestRepository,
+          workerId: w.id,
+          workerName: w.name,
+          workerCategory: w.category,
+          workerPhotoUrl: w.profilePhotoUrl,
+          workerAddress: w.address,
+          workerRating: w.rating,
+          distanceKm: w.distanceKm,
+          services: _services
+              .map((s) => {'name': s.name, 'price': s.price})
+              .toList(),
+        ),
+      ),
     );
   }
 

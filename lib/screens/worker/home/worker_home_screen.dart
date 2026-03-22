@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../home/customer_details_screen.dart';
+import '../../../services/request_payment_service.dart';
 
 class WorkerHomeScreen extends StatefulWidget {
   const WorkerHomeScreen({super.key});
@@ -17,6 +18,7 @@ class WorkerHomeScreen extends StatefulWidget {
 class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final RequestPaymentService _paymentService = RequestPaymentService();
 
   GoogleMapController? _mapController;
   Position? _currentPosition;
@@ -91,9 +93,15 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 
   void _listenToNearbyRequests(Position position) {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
     _requestSubscription = _firestore
         .collection('service_requests')
-        .where('status', isEqualTo: 'pending')
+        .where(
+          'status',
+          whereIn: const ['pending', 'arriving', 'inspection', 'working'],
+        )
         .snapshots()
         .listen((snapshot) {
           if (!mounted) return;
@@ -105,8 +113,19 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           }).toList();
 
           final nearby = requests.where((req) {
-            final lat = req['customerLat'] as double?;
-            final lng = req['customerLng'] as double?;
+            final status = (req['status'] as String?) ?? 'pending';
+            final requestWorkerId = (req['workerId'] as String?) ?? '';
+
+            if (status != 'pending') {
+              return requestWorkerId == uid;
+            }
+
+            if (requestWorkerId.isNotEmpty && requestWorkerId != uid) {
+              return false;
+            }
+
+            final lat = (req['customerLat'] as num?)?.toDouble();
+            final lng = (req['customerLng'] as num?)?.toDouble();
             if (lat == null || lng == null) return false;
 
             final distance = Geolocator.distanceBetween(
@@ -138,8 +157,8 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     );
 
     for (final req in requests) {
-      final lat = req['customerLat'] as double?;
-      final lng = req['customerLng'] as double?;
+      final lat = (req['customerLat'] as num?)?.toDouble();
+      final lng = (req['customerLng'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
 
       markers.add(
@@ -169,10 +188,14 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
     try {
       await _firestore.collection('service_requests').doc(requestId).update({
-        'status': 'accepted',
+        'status': 'arriving',
         'workerId': uid,
         'workerName': _workerData?['name'] ?? '',
+        'workerCategory': _workerData?['category'] ?? '',
+        'workerPhotoUrl': _workerData?['profilePhotoUrl'] ?? '',
+        'workerPhone': _workerData?['phone'] ?? '',
         'acceptedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
@@ -198,8 +221,9 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   ) async {
     try {
       await _firestore.collection('service_requests').doc(requestId).update({
-        'status': 'declined',
+        'status': 'unavailable',
         'declinedAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
@@ -221,8 +245,8 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
   String _distanceLabel(Map<String, dynamic> request) {
     if (_currentPosition == null) return '';
-    final lat = request['customerLat'] as double?;
-    final lng = request['customerLng'] as double?;
+    final lat = (request['customerLat'] as num?)?.toDouble();
+    final lng = (request['customerLng'] as num?)?.toDouble();
     if (lat == null || lng == null) return '';
 
     final dist = Geolocator.distanceBetween(
@@ -238,6 +262,11 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
   /// Navigate to CustomerDetailScreen and handle accept/decline result
   void _openCustomerDetail(Map<String, dynamic> request) async {
+    final status = (request['status'] as String?) ?? 'pending';
+    if (status != 'pending') {
+      return;
+    }
+
     final requestId = request['id'] as String;
 
     final result = await Navigator.push<String>(
@@ -249,6 +278,80 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       await _acceptRequest(requestId, request);
     } else if (result == 'declined') {
       await _declineRequest(requestId, request);
+    }
+  }
+
+  Future<void> _advanceRequestStatus(
+    String requestId,
+    String nextStatus, {
+    String? currentStatus,
+    String? paymentStatus,
+  }) async {
+    if (currentStatus == 'inspection' && paymentStatus != 'held') {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Waiting for customer payment.')),
+      );
+      return;
+    }
+
+    try {
+      await _firestore.collection('service_requests').doc(requestId).update({
+        'status': nextStatus,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (nextStatus == 'finished') {
+        await _paymentService.releaseEscrow(requestId: requestId);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update status: $e')),
+      );
+    }
+  }
+
+  String _nextActionLabel(String status) {
+    switch (status) {
+      case 'arriving':
+        return 'Start Inspection';
+      case 'inspection':
+        return 'Start Working';
+      case 'working':
+        return 'Mark Finished';
+      default:
+        return '';
+    }
+  }
+
+  String _nextStatus(String status) {
+    switch (status) {
+      case 'arriving':
+        return 'inspection';
+      case 'inspection':
+        return 'working';
+      case 'working':
+        return 'finished';
+      default:
+        return status;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'arriving':
+        return 'Arriving';
+      case 'inspection':
+        return 'Inspection';
+      case 'working':
+        return 'Working';
+      case 'finished':
+        return 'Finished';
+      case 'unavailable':
+        return 'Unavailable';
+      default:
+        return 'Pending';
     }
   }
 
@@ -414,9 +517,12 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                     final request = _nearbyRequests[index];
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      // ✅ Tap the card → go to CustomerDetailScreen
+                      // Pending requests can open details; active ones use inline action.
                       child: GestureDetector(
-                        onTap: () => _openCustomerDetail(request),
+                        onTap: (request['status'] as String? ?? 'pending') ==
+                                'pending'
+                            ? () => _openCustomerDetail(request)
+                            : null,
                         child: _buildRequestCard(request),
                       ),
                     );
@@ -639,6 +745,8 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 
   Widget _buildRequestCard(Map<String, dynamic> request) {
+    final status = (request['status'] as String?) ?? 'pending';
+    final paymentStatus = (request['paymentStatus'] as String?) ?? 'unpaid';
     final customerName = request['customerName'] ?? 'Customer';
     final serviceType = request['serviceType'] ?? 'Service Request';
     final customerPhoto = request['customerPhotoUrl'] ?? '';
@@ -757,26 +865,78 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
           const SizedBox(height: 14),
 
-          // ✅ Tap hint chevron
+          // Status + action
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Tap to view details',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey.shade400,
-                  fontWeight: FontWeight.w500,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEF0FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _statusLabel(status),
+                  style: const TextStyle(
+                    color: Color(0xFF4B7DF3),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 16,
-                color: Colors.grey.shade400,
-              ),
+              const Spacer(),
+              if (status == 'pending') ...[
+                Text(
+                  'Tap to view details',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade400,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 16,
+                  color: Colors.grey.shade400,
+                ),
+              ] else if (status != 'finished')
+                GestureDetector(
+                  onTap: () => _advanceRequestStatus(
+                    request['id'] as String,
+                    _nextStatus(status),
+                    currentStatus: status,
+                    paymentStatus: paymentStatus,
+                  ),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4B7DF3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _nextActionLabel(status),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
+          if (status != 'pending') ...[
+            const SizedBox(height: 8),
+            Text(
+              'Payment: $paymentStatus',
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF7A7A80),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
       ),
     );
