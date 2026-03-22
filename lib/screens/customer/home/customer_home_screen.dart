@@ -12,7 +12,7 @@ import '../../../services/location_service.dart';
 import '../../../services/worker_service.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
-import '../../signup/customer/worker_profile.dart';
+import '../worker/worker_profile.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,8 +67,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _selectedAddress = defaultAddress;
       _selectedAddressLabel =
           (defaultAddress != null && defaultAddress.label.isNotEmpty)
-          ? defaultAddress.label
-          : 'Home';
+              ? defaultAddress.label
+              : 'Home';
       _isLoadingDefaultAddress = false;
     });
   }
@@ -89,27 +89,31 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _goToWorkerProfile(Worker worker) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => WorkerProfileScreen(worker: worker)),
-    );
-  }
-
   List<Worker> applyFilters(List<Worker> workers) {
     var filtered = workers;
     if (selectedCategory != 'All') {
       filtered = filtered
           .where(
-            (w) => w.category.toLowerCase() == selectedCategory.toLowerCase(),
+            (worker) =>
+                worker.category.toLowerCase() == selectedCategory.toLowerCase(),
           )
           .toList();
     }
-    if (offersOnly) filtered = filtered.where((w) => w.hasOffer).toList();
-    if (under30Min)
-      filtered = filtered.where((w) => w.travelMinutes <= 30).toList();
-    if (highestRatedOnly)
-      filtered = filtered.where((w) => w.rating >= 4.8).toList();
+
+    if (offersOnly) {
+      filtered = filtered.where((worker) => worker.hasOffer).toList();
+    }
+
+    if (under30Min) {
+      filtered = filtered
+          .where((worker) => worker.travelMinutes <= 30)
+          .toList();
+    }
+
+    if (highestRatedOnly) {
+      filtered = filtered.where((worker) => worker.rating >= 4.8).toList();
+    }
+
     return filtered;
   }
 
@@ -127,89 +131,114 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDDDDDD),
-                  borderRadius: BorderRadius.circular(20),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD9D9D9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'About Fees',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1A1F2E),
+                const SizedBox(height: 18),
+                const Text(
+                  'Varies based on distance and service requirements.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF222222),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Varies based on distance and service requirements.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF9AA3B4),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Divider(height: 1, color: Color(0xFFF0F2F8)),
-              const SizedBox(height: 20),
-              _FeeRow(
-                icon: Icons.directions_car_outlined,
-                iconColor: const Color(0xFF4B7DF3),
-                iconBg: const Color(0xFFEEF2FF),
-                title: 'Travel Fee',
-                description:
-                    'Based on your location, the worker\'s distance, traffic conditions, and local availability.',
-              ),
-              const SizedBox(height: 16),
-              _FeeRow(
-                icon: Icons.search_rounded,
-                iconColor: const Color(0xFF7C5CFC),
-                iconBg: const Color(0xFFF0EBFF),
-                title: 'Inspection Fee',
-                description:
-                    'Depends on service type and whether an on-site assessment is required before starting.',
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1A1F2E),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 18),
+                const Divider(height: 1, color: Color(0xFFE8E8E8)),
+                const SizedBox(height: 16),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Travel Fee',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF222222),
                     ),
                   ),
-                  child: const Text(
-                    'Got it',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Varies based on your location, the worker’s distance, traffic conditions, and availability in your area.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: Color(0xFF666666),
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 18),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Inspection Fee',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF222222),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Varies depending on the type of service and whether an on-site assessment is required before starting the job.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -232,7 +261,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (_selectedAddress?.location != null) {
-      final loc = _selectedAddress!.location!;
+      final selectedLocation = _selectedAddress!.location!;
+
       return _buildHomeContent(
         customerLat: loc.latitude,
         customerLng: loc.longitude,
@@ -362,7 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm)),
             );
             final offers = applyFilters(
-              workersWithFavorites.where((w) => w.hasOffer).toList(),
+              workersWithFavorites.where((worker) => worker.hasOffer).toList(),
             );
             final highestRated = applyFilters(
               [...workersWithFavorites]
@@ -375,154 +405,117 @@ class _HomeScreenState extends State<HomeScreen> {
 
             final bool isCategoryMode = selectedCategory != 'All';
 
-            return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: const SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.light,
-              ),
-              child: SafeArea(
-                top: false,
-                child: Scaffold(
-                  backgroundColor: const Color(0xFFF4F6FB),
-                  body: SingleChildScrollView(
-                    padding: const EdgeInsets.only(bottom: 140),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _HomeHeaderCard(
-                          categories: categories,
-                          selectedCategory: selectedCategory,
-                          onCategoryTap: (c) =>
-                              setState(() => selectedCategory = c),
-                          titleText: _selectedAddressLabel,
-                          onAddressTap: _openAddresses,
-                        ),
-                        const SizedBox(height: 10),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildFilterRow(),
-                        ),
-                        const SizedBox(height: 18),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (isCategoryMode) ...[
-                                Row(
-                                  children: [
-                                    Text(
-                                      '${categoryListResults.length} result${categoryListResults.length == 1 ? '' : 's'}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: Color(0xFF555555),
-                                        fontWeight: FontWeight.w700,
+            return SafeArea(
+              child: Scaffold(
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 140),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HomeHeaderCard(
+                        categories: categories,
+                        selectedCategory: selectedCategory,
+                        onCategoryTap: (category) {
+                          setState(() {
+                            selectedCategory = category;
+                          });
+                        },
+                        titleText: _selectedAddressLabel,
+                        onAddressTap: _openAddresses,
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _buildFilterRow(),
+                      ),
+                      const SizedBox(height: 16),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (isCategoryMode) ...[
+                              Row(
+                                children: [
+                                  Text(
+                                    '${categoryListResults.length} results',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF555555),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  GestureDetector(
+                                    onTap: resetFilters,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F1F1),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Text(
+                                        'Reset',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF444444),
+                                        ),
                                       ),
                                     ),
-                                    const Spacer(),
-                                    GestureDetector(
-                                      onTap: resetFilters,
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              if (categoryListResults.isEmpty)
+                                const _EmptySectionText(
+                                  text: 'No workers found for this category',
+                                )
+                              else
+                                ...categoryListResults.map(
+                                  (worker) => _WorkerListTile(
+                                    worker: worker,
+                                    travelFeeLabel: _travelFeeLabel(worker),
+                                    onFavoriteTap: () =>
+                                        _favoriteService.toggleFavorite(
+                                          worker.id,
+                                          worker.isFavorite,
                                         ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFEEF2FF),
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          'Reset filters',
-                                          style: TextStyle(
-                                            fontSize: 11.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: Color(0xFF4B7DF3),
-                                          ),
-                                        ),
+                                  ),
+                                ),
+                            ] else ...[
+                              RichText(
+                                text: TextSpan(
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF666666),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Additional fees may apply. ',
+                                    ),
+                                    TextSpan(
+                                      text: 'Learn more',
+                                      style: const TextStyle(
+                                        color: Color(0xFF222222),
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.underline,
                                       ),
+                                      recognizer: TapGestureRecognizer()
+                                        ..onTap = _showFeesInfoSheet,
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 14),
-                                if (categoryListResults.isEmpty)
-                                  const _EmptySectionText(
-                                    text: 'No workers found for this category',
-                                  )
-                                else
-                                  ...categoryListResults.map(
-                                    (worker) => _WorkerListTile(
-                                      worker: worker,
-                                      travelFeeLabel: _travelFeeLabel(worker),
-                                      onFavoriteTap: () =>
-                                          _favoriteService.toggleFavorite(
-                                            worker.id,
-                                            worker.isFavorite,
-                                          ),
-                                      onTap: () => _goToWorkerProfile(worker),
-                                    ),
-                                  ),
-                              ] else ...[
-                                // Fees notice
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF0F4FF),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: const Color(0xFFD6E2FF),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.info_outline_rounded,
-                                        size: 15,
-                                        color: Color(0xFF4B7DF3),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: RichText(
-                                          text: TextSpan(
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                              color: Color(0xFF4B7DF3),
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            children: [
-                                              const TextSpan(
-                                                text:
-                                                    'Additional fees may apply. ',
-                                              ),
-                                              TextSpan(
-                                                text: 'Learn more',
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  decoration:
-                                                      TextDecoration.underline,
-                                                ),
-                                                recognizer:
-                                                    TapGestureRecognizer()
-                                                      ..onTap =
-                                                          _showFeesInfoSheet,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 22),
-
-                                _SectionHeader(
-                                  title: 'Featured on SkillFox',
-                                  onSeeAll: () => Navigator.push(
+                              ),
+                              const SizedBox(height: 14),
+                              _SectionHeader(
+                                title: 'Featured on SkillFox',
+                                onSeeAll: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SectionWorkersScreen(
@@ -530,15 +523,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         workers: featured,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _buildListPreview(featured, 2),
-                                const SizedBox(height: 26),
-
-                                _SectionHeader(
-                                  title: 'Book again',
-                                  onSeeAll: () => Navigator.push(
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildListPreview(featured, 2),
+                              const SizedBox(height: 22),
+                              _SectionHeader(
+                                title: 'Book again',
+                                onSeeAll: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SectionWorkersScreen(
@@ -546,15 +540,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         workers: bookAgain,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildGridPreview(bookAgain, 4),
-                                const SizedBox(height: 26),
-
-                                _SectionHeader(
-                                  title: 'Workers near you',
-                                  onSeeAll: () => Navigator.push(
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              _buildGridPreview(bookAgain, 4),
+                              const SizedBox(height: 22),
+                              _SectionHeader(
+                                title: 'Workers near you',
+                                onSeeAll: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SectionWorkersScreen(
@@ -562,15 +557,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         workers: nearby,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _buildListPreview(nearby, 2),
-                                const SizedBox(height: 26),
-
-                                _SectionHeader(
-                                  title: "Today's offers",
-                                  onSeeAll: () => Navigator.push(
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildListPreview(nearby, 2),
+                              const SizedBox(height: 22),
+                              _SectionHeader(
+                                title: "Today's offers",
+                                onSeeAll: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SectionWorkersScreen(
@@ -578,15 +574,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                         workers: offers,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _buildOfferPreview(offers, 2),
-                                const SizedBox(height: 26),
-
-                                _SectionHeader(
-                                  title: 'Highest rated',
-                                  onSeeAll: () => Navigator.push(
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildOfferPreview(offers, 2),
+                              const SizedBox(height: 22),
+                              _SectionHeader(
+                                title: 'Highest rated',
+                                onSeeAll: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => SectionWorkersScreen(
@@ -594,20 +591,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                         workers: highestRated,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _buildListPreview(highestRated, 2),
-                              ],
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              _buildListPreview(highestRated, 2),
                             ],
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              ), // SafeArea
-            ); // AnnotatedRegion
+              ),
+            );
           },
         );
       },
@@ -645,7 +642,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildListPreview(List<Worker> workers, int count) {
-    if (workers.isEmpty) return const _EmptySectionText();
+    if (workers.isEmpty) {
+      return const _EmptySectionText();
+    }
+
+    final preview = workers.take(count).toList();
     return Column(
       children: workers
           .take(count)
@@ -663,7 +664,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildOfferPreview(List<Worker> workers, int count) {
-    if (workers.isEmpty) return const _EmptySectionText();
+    if (workers.isEmpty) {
+      return const _EmptySectionText();
+    }
+
+    final preview = workers.take(count).toList();
     return Column(
       children: workers
           .take(count)
@@ -706,6 +711,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+// ═══════════════════════════════════════════════════════
+//  PRIVATE WIDGETS
+// ═══════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════
 //  Fee Row (bottom sheet helper)
@@ -890,7 +899,6 @@ class _HomeHeaderCard extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final category = categories[index];
                   final bool isSelected = selectedCategory == category.label;
-
                   return GestureDetector(
                     onTap: () => onCategoryTap(category.label),
                     child: SizedBox(
@@ -902,8 +910,7 @@ class _HomeHeaderCard extends StatelessWidget {
                             width: 56,
                             height: 56,
                             padding: EdgeInsets.all(
-                              category.label == 'All' ? 0 : 7,
-                            ),
+                                category.label == 'All' ? 0 : 7),
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? const Color(0xFFEFF3FF)
@@ -1064,8 +1071,7 @@ class _FilterChipWidget extends StatelessWidget {
           color: selected ? const Color(0xFF4B7DF3) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? const Color(0xFF4B7DF3) : const Color(0xFFE2E6F0),
-            width: 1.5,
+            color: selected ? const Color(0xFF7B61FF) : const Color(0xFFE6E8F0),
           ),
           boxShadow: selected
               ? [
@@ -1088,8 +1094,10 @@ class _FilterChipWidget extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 14,
-              color: selected ? Colors.white : const Color(0xFF777777),
+              size: 16,
+              color: selected
+                  ? const Color(0xFF6F5CFF)
+                  : const Color(0xFF666666),
             ),
             const SizedBox(width: 6),
             Text(
@@ -1107,354 +1115,244 @@ class _FilterChipWidget extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Worker List Tile
-// ═══════════════════════════════════════════════
 class _WorkerListTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
   final VoidCallback onFavoriteTap;
-  final VoidCallback onTap;
 
   const _WorkerListTile({
     required this.worker,
     required this.travelFeeLabel,
     required this.onFavoriteTap,
-    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFF0F2F8))),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Stack(
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 27,
+            backgroundColor: const Color(0xFFE6EAF7),
+            backgroundImage: worker.profilePhotoUrl.isNotEmpty
+                ? NetworkImage(worker.profilePhotoUrl)
+                : null,
+            child: worker.profilePhotoUrl.isEmpty
+                ? const Icon(Icons.person, size: 28, color: Color(0xFF5B6475))
+                : null,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 27,
-                  backgroundColor: const Color(0xFFE6EAF7),
-                  backgroundImage: worker.profilePhotoUrl.isNotEmpty
-                      ? NetworkImage(worker.profilePhotoUrl)
-                      : null,
-                  child: worker.profilePhotoUrl.isEmpty
-                      ? const Icon(
-                          Icons.person,
-                          size: 26,
-                          color: Color(0xFF5B6475),
-                        )
-                      : null,
+                Text(
+                  worker.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF222222),
+                  ),
                 ),
-                if (worker.hasOffer)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+                const SizedBox(height: 4),
+                Text(
+                  worker.category,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF8A8A8A),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$travelFeeLabel • ${worker.travelMinutes} min',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF8A8A8A),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 16,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      worker.rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${worker.distanceKm.toStringAsFixed(1)} km',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF8A8A8A),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    worker.name,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1F2E),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    worker.category,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9AA3B4),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 14,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        worker.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1F2E),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFCBD0DC),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${worker.distanceKm.toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9AA3B4),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFCBD0DC),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${worker.travelMinutes} min',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9AA3B4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onFavoriteTap,
+            child: Icon(
+              worker.isFavorite
+                  ? Icons.favorite
+                  : Icons.favorite_border_rounded,
+              color: worker.isFavorite ? Colors.redAccent : Colors.black45,
+              size: 28,
             ),
-            const SizedBox(width: 8),
-            GestureDetector(
-              onTap: onFavoriteTap,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: worker.isFavorite
-                      ? const Color(0xFFFFEBEB)
-                      : const Color(0xFFF4F6FB),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  worker.isFavorite
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
-                  color: worker.isFavorite
-                      ? Colors.redAccent
-                      : const Color(0xFFBCC4D4),
-                  size: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Worker Card (Grid)
-// ═══════════════════════════════════════════════
 class _WorkerCard extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
   final VoidCallback onFavoriteTap;
-  final VoidCallback onTap;
 
   const _WorkerCard({
     required this.worker,
     required this.travelFeeLabel,
     required this.onFavoriteTap,
-    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(11),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFEAECEF)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                Container(
-                  height: 100,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8EAF3),
-                    borderRadius: BorderRadius.circular(14),
-                    image: worker.profilePhotoUrl.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(worker.profilePhotoUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child: worker.profilePhotoUrl.isEmpty
-                      ? const Center(
-                          child: Icon(
-                            Icons.person,
-                            size: 40,
-                            color: Color(0xFF677082),
-                          ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              Container(
+                height: 105,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8EAF3),
+                  borderRadius: BorderRadius.circular(18),
+                  image: worker.profilePhotoUrl.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(worker.profilePhotoUrl),
+                          fit: BoxFit.cover,
                         )
                       : null,
                 ),
-                Positioned(
-                  top: 7,
-                  right: 7,
-                  child: GestureDetector(
-                    onTap: onFavoriteTap,
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: worker.isFavorite
-                            ? const Color(0xFFFFEBEB)
-                            : Colors.white.withOpacity(0.9),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 6,
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        worker.isFavorite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        size: 16,
-                        color: worker.isFavorite
-                            ? Colors.redAccent
-                            : const Color(0xFFBCC4D4),
-                      ),
-                    ),
-                  ),
-                ),
-                if (worker.hasOffer)
-                  Positioned(
-                    top: 7,
-                    left: 7,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'OFFER',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: 0.3,
+                child: worker.profilePhotoUrl.isEmpty
+                    ? const Center(
+                        child: Icon(
+                          Icons.person,
+                          size: 42,
+                          color: Color(0xFF677082),
                         ),
-                      ),
+                      )
+                    : null,
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: onFavoriteTap,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      worker.isFavorite
+                          ? Icons.favorite
+                          : Icons.favorite_border_rounded,
+                      size: 18,
+                      color: worker.isFavorite
+                          ? Colors.redAccent
+                          : Colors.black45,
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              worker.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1F2E),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              worker.category,
-              style: const TextStyle(fontSize: 11.5, color: Color(0xFF9AA3B4)),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                const SizedBox(width: 3),
-                Text(
-                  worker.rating.toStringAsFixed(1),
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1F2E),
-                  ),
                 ),
-                const Spacer(),
-                Text(
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            worker.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF222222),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            worker.category,
+            style: const TextStyle(fontSize: 11.5, color: Color(0xFF8A8A8A)),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$travelFeeLabel • ${worker.travelMinutes} min',
+            style: const TextStyle(fontSize: 10.5, color: Color(0xFF8A8A8A)),
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                worker.rating.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
                   '${worker.distanceKm.toStringAsFixed(1)} km',
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF9AA3B4),
+                    color: Color(0xFF8A8A8A),
                   ),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Offer Tile
-// ═══════════════════════════════════════════════
 class _OfferTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
   final VoidCallback onFavoriteTap;
-  final VoidCallback onTap;
 
   const _OfferTile({
     required this.worker,
     required this.travelFeeLabel,
     required this.onFavoriteTap,
-    required this.onTap,
   });
 
   @override
@@ -1462,144 +1360,106 @@ class _OfferTile extends StatelessWidget {
     final offerBadge = worker.offerType == 'free_travel'
         ? 'FREE TRAVEL'
         : 'OFFER';
-    final badgeColor = worker.offerType == 'free_travel'
-        ? const Color(0xFF2E7D32)
-        : Colors.redAccent;
-    final badgeBg = worker.offerType == 'free_travel'
-        ? const Color(0xFFE8F5E9)
-        : const Color(0xFFFFEBEB);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFF0F2F8))),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: 27,
-              backgroundColor: const Color(0xFFE6EAF7),
-              backgroundImage: worker.profilePhotoUrl.isNotEmpty
-                  ? NetworkImage(worker.profilePhotoUrl)
-                  : null,
-              child: worker.profilePhotoUrl.isEmpty
-                  ? const Icon(Icons.person, size: 26, color: Color(0xFF5B6475))
-                  : null,
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    worker.name,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1F2E),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    worker.category,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9AA3B4),
-                    ),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 14,
-                        color: Colors.amber,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        worker.rating.toStringAsFixed(1),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1F2E),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${worker.distanceKm.toStringAsFixed(1)} km • ${worker.travelMinutes} min',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9AA3B4),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 27,
+            backgroundColor: const Color(0xFFE6EAF7),
+            backgroundImage: worker.profilePhotoUrl.isNotEmpty
+                ? NetworkImage(worker.profilePhotoUrl)
+                : null,
+            child: worker.profilePhotoUrl.isEmpty
+                ? const Icon(Icons.person, size: 28, color: Color(0xFF5B6475))
+                : null,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    offerBadge,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: badgeColor,
-                      letterSpacing: 0.3,
-                    ),
+                Text(
+                  worker.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: onFavoriteTap,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: worker.isFavorite
-                          ? const Color(0xFFFFEBEB)
-                          : const Color(0xFFF4F6FB),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      worker.isFavorite
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: worker.isFavorite
-                          ? Colors.redAccent
-                          : const Color(0xFFBCC4D4),
-                      size: 16,
-                    ),
+                const SizedBox(height: 4),
+                Text(
+                  worker.category,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: Color(0xFF8A8A8A),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$travelFeeLabel • ${worker.travelMinutes} min',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF8A8A8A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${worker.distanceKm.toStringAsFixed(1)} km away',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    color: Color(0xFF8A8A8A),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE5E5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  offerBadge,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.redAccent,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: onFavoriteTap,
+                child: Icon(
+                  worker.isFavorite
+                      ? Icons.favorite
+                      : Icons.favorite_border_rounded,
+                  color: worker.isFavorite ? Colors.redAccent : Colors.black45,
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Empty Section Text
-// ═══════════════════════════════════════════════
 class _EmptySectionText extends StatelessWidget {
   final String text;
+
   const _EmptySectionText({this.text = 'No workers found for this section'});
 
   @override
