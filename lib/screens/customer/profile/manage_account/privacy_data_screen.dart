@@ -159,14 +159,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                             content:
                                 'We store records of your bookings, viewed worker profiles, applied filters, and favourited workers. This data helps us improve recommendations, resolve disputes, and provide an accurate booking history in your account.',
                           ),
-                          _PrivacyTileData(
-                            icon: Icons.phone_android_rounded,
-                            iconColor: Color(0xFF00897B),
-                            iconBg: Color(0xFFE0F4F1),
-                            title: 'Device and usage data',
-                            content:
-                                'We may collect basic device information such as your operating system version and app usage patterns. This data is used to diagnose technical issues, improve app performance, and ensure a stable experience across devices.',
-                          ),
                         ],
                       ),
                       const SizedBox(height: 26),
@@ -223,7 +215,7 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                             iconBg: Color(0xFFFFEBEB),
                             title: 'Sharing your data',
                             content:
-                                'SkillFox does not sell your personal data to third parties. Your information may be shared with the workers you book a service from, limited to what is necessary to complete the service. We may also share data with service providers who help us operate the platform, under strict confidentiality agreements.',
+                                'SkillFox does not sell your personal data to third parties. Your information may be shared with the workers you book a service from, limited to what is necessary to complete the service.',
                           ),
                           _PrivacyTileData(
                             icon: Icons.delete_outline_rounded,
