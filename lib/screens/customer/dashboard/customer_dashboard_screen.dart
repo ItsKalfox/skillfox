@@ -5,6 +5,7 @@ import '../search/customer_search_screen.dart';
 import '../bookings/customer_bookings_screen.dart';
 import '../profile/customer_profile_screen.dart';
 
+
 class CustomerDashboardScreen extends StatefulWidget {
   const CustomerDashboardScreen({super.key});
 
@@ -21,7 +22,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     HomeScreen(),
     CustomerCommunityFeedScreen(),
     CustomerSearchScreen(),
-    CustomerBookingsScreen(),
+    MyBookingsScreen(),
     CustomerProfileScreen(),
   ];
 

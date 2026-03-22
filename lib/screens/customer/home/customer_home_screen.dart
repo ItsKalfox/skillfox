@@ -10,6 +10,8 @@ import '../../../services/address_service.dart';
 import '../../../core/utils/week_helper.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
+import 'package:skillfox/screens/category_a/customer_request_screen.dart';//added
+import 'package:skillfox/screens/category_a/inspection_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -257,6 +259,26 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}';
   }
 
+  bool _isCategoryAWorker(Worker worker) {
+    const categoryA = {'plumber', 'electrician', 'mechanic'};
+    return categoryA.contains(worker.category.toLowerCase());
+  }
+
+  void _openWorkerRequestScreen(Worker worker) {
+  if (!_isCategoryAWorker(worker)) {
+    return;
+  }
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => InspectionFormScreen(
+        worker: worker,
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     if (_isLoadingDefaultAddress) {
@@ -466,6 +488,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   (worker) => _WorkerListTile(
                                     worker: worker,
                                     travelFeeLabel: _travelFeeLabel(worker),
+                                    onTap: () =>
+                                        _openWorkerRequestScreen(worker),
                                     onFavoriteTap: () =>
                                         _favoriteService.toggleFavorite(
                                           worker.id,
@@ -652,6 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (worker) => _WorkerListTile(
               worker: worker,
               travelFeeLabel: _travelFeeLabel(worker),
+              onTap: () => _openWorkerRequestScreen(worker),
               onFavoriteTap: () =>
                   _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
             ),
@@ -672,6 +697,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (worker) => _OfferTile(
               worker: worker,
               travelFeeLabel: _travelFeeLabel(worker),
+              onTap: () => _openWorkerRequestScreen(worker),
               onFavoriteTap: () =>
                   _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
             ),
@@ -701,6 +727,7 @@ class _HomeScreenState extends State<HomeScreen> {
       itemBuilder: (_, index) => _WorkerCard(
         worker: preview[index],
         travelFeeLabel: _travelFeeLabel(preview[index]),
+        onTap: () => _openWorkerRequestScreen(preview[index]),
         onFavoriteTap: () => _favoriteService.toggleFavorite(
           preview[index].id,
           preview[index].isFavorite,
@@ -970,24 +997,28 @@ class _FilterChipWidget extends StatelessWidget {
 class _WorkerListTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
+  final VoidCallback onTap;
   final VoidCallback onFavoriteTap;
 
   const _WorkerListTile({
     required this.worker,
     required this.travelFeeLabel,
+    required this.onTap,
     required this.onFavoriteTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           CircleAvatar(
             radius: 27,
             backgroundColor: const Color(0xFFE6EAF7),
@@ -1068,7 +1099,8 @@ class _WorkerListTile extends StatelessWidget {
               size: 28,
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1077,26 +1109,30 @@ class _WorkerListTile extends StatelessWidget {
 class _WorkerCard extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
+  final VoidCallback onTap;
   final VoidCallback onFavoriteTap;
 
   const _WorkerCard({
     required this.worker,
     required this.travelFeeLabel,
+    required this.onTap,
     required this.onFavoriteTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: const Color(0xFFEAECEF)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Stack(
             children: [
               Container(
@@ -1190,7 +1226,8 @@ class _WorkerCard extends StatelessWidget {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1199,11 +1236,13 @@ class _WorkerCard extends StatelessWidget {
 class _OfferTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
+  final VoidCallback onTap;
   final VoidCallback onFavoriteTap;
 
   const _OfferTile({
     required this.worker,
     required this.travelFeeLabel,
+    required this.onTap,
     required this.onFavoriteTap,
   });
 
@@ -1213,14 +1252,16 @@ class _OfferTile extends StatelessWidget {
         ? 'FREE TRAVEL'
         : 'OFFER';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFE9E9E9))),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
           CircleAvatar(
             radius: 27,
             backgroundColor: const Color(0xFFE6EAF7),
@@ -1303,7 +1344,8 @@ class _OfferTile extends StatelessWidget {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

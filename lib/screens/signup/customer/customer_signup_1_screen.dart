@@ -16,7 +16,7 @@ class _CustomerSignup1ScreenState extends State<CustomerSignup1Screen> {
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
