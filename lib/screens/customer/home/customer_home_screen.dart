@@ -12,7 +12,7 @@ import '../../../services/location_service.dart';
 import '../../../services/worker_service.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
-import '../../signup/customer/worker_profile.dart';
+import '../worker/worker_profile.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
