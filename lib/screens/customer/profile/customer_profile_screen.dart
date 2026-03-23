@@ -10,6 +10,7 @@ import '../profile/manage_account/manage_account_screen.dart';
 import '../profile/support/about_screen.dart';
 import '../profile/support/help_screen.dart';
 import '../profile/favourites/favorites_screen.dart';
+import '../profile/wallet/customer_wallet_screen.dart';
 
 class CustomerProfileScreen extends StatelessWidget {
   const CustomerProfileScreen({super.key});
@@ -160,6 +161,21 @@ class CustomerProfileScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const CustomerFavoritesScreen(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _QuickActionCard(
+                          icon: Icons.account_balance_wallet_rounded,
+                          iconColor: const Color(0xFF0E9F6E),
+                          iconBg: const Color(0xFFE8F8F2),
+                          label: 'Wallet',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CustomerWalletScreen(),
                             ),
                           ),
                         ),

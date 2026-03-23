@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../services/request_payment_service.dart';
+import '../../../services/wallet_service.dart';
 import 'payment_success_page.dart';
 
 class PayWorkerPage extends StatefulWidget {
@@ -28,6 +30,7 @@ class PayWorkerPage extends StatefulWidget {
 
 class _PayWorkerPageState extends State<PayWorkerPage> {
   final RequestPaymentService _paymentService = RequestPaymentService();
+  final WalletService _walletService = WalletService();
   bool _isPaying = false;
 
   String _formatLkr(double amount) => 'LKR ${amount.toStringAsFixed(0)}';
@@ -38,12 +41,34 @@ class _PayWorkerPageState extends State<PayWorkerPage> {
     });
 
     try {
-      await _paymentService.holdPayment(
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) {
+        throw StateError('No signed-in user');
+      }
+
+      await _walletService.payWorker(
+        userId: uid,
         requestId: widget.requestId,
+        workerName: widget.workerName,
         amount: widget.total,
-        paymentMethod: 'mastercard_9999',
-        markAsWorking: widget.markAsWorking,
       );
+
+      try {
+        await _paymentService.holdPayment(
+          requestId: widget.requestId,
+          amount: widget.total,
+          paymentMethod: 'wallet',
+          markAsWorking: widget.markAsWorking,
+        );
+      } catch (_) {
+        await _walletService.topUp(
+          userId: uid,
+          amount: widget.total,
+          source: 'rollback',
+          note: 'Auto rollback after payment hold failure',
+        );
+        rethrow;
+      }
 
       if (!mounted) return;
 
