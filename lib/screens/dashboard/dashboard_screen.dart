@@ -64,11 +64,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   );
 } else {
   Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const WorkerRequestsScreen(), // ✅ FIXED
-    ),
-  );
+  context,
+  MaterialPageRoute(
+    builder: (_) => const WorkerRequestsScreen(),
+  ),
+);
 }
 }
 

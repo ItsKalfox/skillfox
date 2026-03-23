@@ -9,6 +9,7 @@ class PaymentScreen extends StatefulWidget {
   final double serviceFee;
 
   const PaymentScreen({
+    
     super.key,
     required this.requestId,
     required this.totalAmount,
@@ -16,6 +17,7 @@ class PaymentScreen extends StatefulWidget {
     required this.distanceFee,
     required this.serviceFee,
   });
+
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();

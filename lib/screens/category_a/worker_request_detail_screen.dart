@@ -4,8 +4,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'worker_job_progress_screen.dart';
-import 'quotation_screen.dart';
-//import '../category_a/worker_job_progress_screen.dart';
 
 class WorkerRequestDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
@@ -27,7 +25,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
     final status    = data['status']       ?? 'pending';
     final timestamp = data['createdAt'];
 
-    // FIX: guard against null/zero lat-lng — use 0.0 fallback instead of crashing
     final double lat = (data['latitude']  as num?)?.toDouble() ?? 0.0;
     final double lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
     final bool hasLocation = lat != 0.0 && lng != 0.0;
@@ -50,21 +47,21 @@ class WorkerRequestDetailScreen extends StatelessWidget {
       }
     }
 
+    // Statuses where we show "View Progress" instead of accept/reject
+    final isActiveJob = status != 'pending' && status != 'cancelled' && status != 'rejected';
+
     return Scaffold(
       body: Stack(children: [
         Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [
-              Color(0xFF469FEF),
-              Color(0xFF5C75F0),
-              Color(0xFF6C56F0),
-            ]),
+            gradient: LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF5C75F0), Color(0xFF6C56F0)]),
           ),
         ),
 
         SafeArea(
           child: Column(children: [
-            // ── Header ───────────────────────────────────────────────────
+
+            // ── Header ────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.all(16),
               child: Row(children: [
@@ -74,48 +71,35 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text('Request Details',
-                    style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
+                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ]),
             ),
 
-            // ── Content ──────────────────────────────────────────────────
+            // ── Content ───────────────────────────────────────────────────
             Expanded(
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(
                   color: Color(0xFFF4F6FA),
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(30)),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
                 ),
                 child: SingleChildScrollView(
                   child: Column(children: [
+
                     // Customer card
                     Container(
                       padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16)),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
                       child: Row(children: [
                         CircleAvatar(
                           backgroundColor: const Color(0xFF469FEF),
-                          child: Text(initials(name),
-                              style: const TextStyle(color: Colors.white)),
+                          child: Text(initials(name), style: const TextStyle(color: Colors.white)),
                         ),
                         const SizedBox(width: 10),
-                        Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold)),
-                          Text(phone,
-                              style: const TextStyle(fontSize: 12)),
-                          Text('Request ID: $requestId',
-                              style: const TextStyle(
-                                  fontSize: 11, color: Colors.grey)),
+                        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text(phone, style: const TextStyle(fontSize: 12)),
+                          Text('Request ID: $requestId', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                         ]),
                       ]),
                     ),
@@ -130,24 +114,15 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
                     const SizedBox(height: 12),
 
-                    // Map — only show if we have real coordinates
+                    // Map
                     if (hasLocation) ...[
                       SizedBox(
                         height: 200,
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: GoogleMap(
-                            initialCameraPosition: CameraPosition(
-                              target: LatLng(lat, lng),
-                              zoom: 15,
-                            ),
-                            markers: {
-                              Marker(
-                                markerId:
-                                    const MarkerId('customerLocation'),
-                                position: LatLng(lat, lng),
-                              ),
-                            },
+                            initialCameraPosition: CameraPosition(target: LatLng(lat, lng), zoom: 15),
+                            markers: {Marker(markerId: const MarkerId('customerLocation'), position: LatLng(lat, lng))},
                             zoomControlsEnabled: false,
                           ),
                         ),
@@ -156,16 +131,8 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                     ] else ...[
                       Container(
                         height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFE2E6F0)),
-                        ),
-                        child: const Center(
-                          child: Text('Location not available',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
-                        ),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E6F0))),
+                        child: const Center(child: Text('Location not available', style: TextStyle(fontSize: 12, color: Colors.grey))),
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -173,45 +140,22 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                     _sectionCard('Address', address),
                     const SizedBox(height: 12),
                     _sectionCard('Description', desc),
-
                     const SizedBox(height: 12),
 
                     // Images
                     if (images.isNotEmpty)
                       Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16)),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          const Text('Inspection Photos',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
+                        width: double.infinity, padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Text('Inspection Photos', style: TextStyle(fontSize: 12, color: Colors.grey)),
                           const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: images.map((img) {
-                              return GestureDetector(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        FullScreenImage(imageUrl: img),
-                                  ),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(img,
-                                      height: 90,
-                                      width: 90,
-                                      fit: BoxFit.cover),
-                                ),
-                              );
-                            }).toList(),
+                          Wrap(spacing: 10, runSpacing: 10,
+                            children: images.map((img) => GestureDetector(
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenImage(imageUrl: img))),
+                              child: ClipRRect(borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(img, height: 90, width: 90, fit: BoxFit.cover)),
+                            )).toList(),
                           ),
                         ]),
                       ),
@@ -222,140 +166,77 @@ class WorkerRequestDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // ── Action buttons ────────────────────────────────────────────
+            // ── Action buttons ─────────────────────────────────────────────
             Container(
               padding: const EdgeInsets.all(16),
               color: Colors.white,
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Row(children: [
-                  // FIX: Reject writes status='rejected' (not 'cancelled')
-                  // so customer sees the red rejection banner correctly
+
+                  // Reject button (pending only)
                   if (status == 'pending')
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
                           final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance
-                              .collection('requests')
-                              .doc(requestId)
-                              .update({
-                            'status':     'rejected',  // FIX was 'cancelled'
-                            'rejectedBy': 'worker',
-                            'rejectedAt': FieldValue.serverTimestamp(),
+                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
+                            'status': 'rejected', 'rejectedBy': 'worker', 'rejectedAt': FieldValue.serverTimestamp(),
                           });
                           nav.pop();
                         },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red),
-                        child: const Text('Reject',
-                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        child: const Text('Reject', style: TextStyle(color: Colors.white)),
                       ),
                     ),
 
+                  // Cancel button (accepted within 10 min)
                   if (status == 'accepted' && canCancel)
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
                           final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance
-                              .collection('requests')
-                              .doc(requestId)
-                              .update({
-                            'status':      'cancelled',
-                            'cancelledBy': 'worker',
-                            'cancelledAt': FieldValue.serverTimestamp(),
+                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
+                            'status': 'cancelled', 'cancelledBy': 'worker', 'cancelledAt': FieldValue.serverTimestamp(),
                           });
                           nav.pop();
                         },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red),
-                        child: const Text('Cancel',
-                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                        child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                       ),
                     ),
 
                   if (status == 'pending') const SizedBox(width: 10),
 
-                  // Accept button
+                  // Accept button (pending only)
                   if (status == 'pending')
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
                           final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance
-                              .collection('requests')
-                              .doc(requestId)
-                              .update({
-                            'status':     'accepted',
-                            'acceptedAt': FieldValue.serverTimestamp(),
+                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
+                            'status': 'accepted', 'acceptedAt': FieldValue.serverTimestamp(),
                           });
                           nav.pop();
                         },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6C56F0)),
-                        child: const Text('Accept Request',
-                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C56F0)),
+                        child: const Text('Accept Request', style: TextStyle(color: Colors.white)),
                       ),
                     ),
 
-                  // FIX: View Progress goes to WorkerJobProgressScreen
-                  // NOT WaitingWorkerScreen (which is the customer screen)
-                  if (status != 'pending' && status != 'cancelled' && status != 'rejected')
+                  // ── View Progress (all active statuses) ──────────────────
+                  // NO Send Quotation here — that's inside WorkerJobProgressScreen
+                  if (isActiveJob)
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => WorkerJobProgressScreen(
-                                requestId: requestId,
-                                requestData: data,
-                              ),
-                            ),
-                          );
+                          Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => WorkerJobProgressScreen(requestId: requestId, requestData: data)));
                         },
-                        style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4A98EF)),
-                        child: const Text('View Progress',
-                            style: TextStyle(color: Colors.white)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A98EF)),
+                        child: const Text('View Progress', style: TextStyle(color: Colors.white)),
                       ),
                     ),
                 ]),
-
-                // Send Quotation button — shown for accepted/inprogress
-                if (status == 'accepted' || status == 'inprogress') ...[
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => QuotationScreen(
-                              requestId:   requestId,
-                              requestData: data,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.description_outlined,
-                          color: Colors.white, size: 18),
-                      label: const Text('Send Quotation',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                ],
               ]),
             ),
           ]),
@@ -365,15 +246,10 @@ class WorkerRequestDetailScreen extends StatelessWidget {
   }
 
   Widget _sectionCard(String title, String value) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
+        width: double.infinity, padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 6),
           Text(value),
         ]),
@@ -381,15 +257,11 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
   Widget _infoBox(String title, String value) => Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-        ),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: const TextStyle(fontSize: 10)),
           const SizedBox(height: 4),
-          Text(value,
-              style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ]),
       );
 }
@@ -401,14 +273,7 @@ class FullScreenImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: Center(
-          child: InteractiveViewer(
-            child: Image.network(imageUrl),
-          ),
-        ),
+        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+        body: Center(child: InteractiveViewer(child: Image.network(imageUrl))),
       );
 }
