@@ -242,7 +242,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
     final result = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (_) => CustomerDetailScreen(request: request)),
+      MaterialPageRoute(builder: (_) => WorkerDetailScreen(request: request)),
     );
 
     if (result == 'accepted') {

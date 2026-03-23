@@ -12,7 +12,9 @@ import '../../../services/location_service.dart';
 import '../../../services/worker_service.dart';
 import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
-import '../../customer/worker/worker_profile.dart';
+
+import 'package:skillfox/screens/category_a/customer_request_screen.dart'; //added
+import 'package:skillfox/screens/category_a/inspection_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,6 +53,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _CategoryData(label: 'Caregiver', imagePath: 'assets/icons/caregiver.png'),
     _CategoryData(label: 'Mason', imagePath: 'assets/icons/mason.png'),
     _CategoryData(label: 'Handyman', imagePath: 'assets/icons/handyman.png'),
+    _CategoryData(label: 'Painter', imagePath: 'assets/icons/painter.png'),
+    _CategoryData(label: 'Gardener', imagePath: 'assets/icons/gardener.png'),
+    _CategoryData(label: 'Driver', imagePath: 'assets/icons/driver.png'),
+    _CategoryData(
+      label: 'IT Support',
+      imagePath: 'assets/icons/it_support.png',
+    ),
   ];
 
   @override
@@ -89,10 +98,18 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _goToWorkerProfile(Worker worker) {
+  bool _isCategoryAWorker(Worker worker) {
+    const categoryA = {'plumber', 'electrician', 'mechanic'};
+    return categoryA.contains(worker.category.toLowerCase());
+  }
+
+  void _openWorkerRequestScreen(Worker worker) {
+    if (!_isCategoryAWorker(worker)) {
+      return;
+    }
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => WorkerProfileScreen(worker: worker)),
+      MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: worker)),
     );
   }
 
@@ -138,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Handle bar
               Container(
                 width: 40,
                 height: 4,
@@ -212,22 +230,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Returns the actual travel fee string for a worker
   String _travelFeeLabel(Worker worker) {
-    if (worker.hasOffer && worker.offerType == 'Free Travel') {
-      return 'LKR 0';
+    if (worker.hasOffer && worker.offerType == 'free_travel') {
+      return 'Travel fee LKR 0';
     }
-    return 'LKR ${worker.travelFee.toStringAsFixed(0)}';
-  }
-
-  String _offerBadgeLabel(Worker worker) {
-    if (worker.offerType == 'Free Travel') return 'FREE TRAVEL';
-    if (worker.offerType == 'Percentage Discount') {
-      return worker.offerDetails.isNotEmpty
-          ? '${worker.offerDetails} OFF'
-          : 'DISCOUNT';
-    }
-    return worker.offerDetails.isNotEmpty ? worker.offerDetails : 'OFFER';
+    return 'Travel fee LKR ${worker.travelFee.toStringAsFixed(0)}';
   }
 
   @override
@@ -349,12 +356,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 travelFee: worker.travelFee,
                 hasOffer: worker.hasOffer,
                 offerType: worker.offerType,
-                offerDetails: worker.offerDetails,
                 isFeatured: worker.isFeatured,
                 featuredWeekKey: worker.featuredWeekKey,
                 isFavorite: favoriteIds.contains(worker.id),
                 profilePhotoUrl: worker.profilePhotoUrl,
                 address: worker.address,
+                offerDetails: '',
               );
             }).toList();
 
@@ -466,13 +473,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                     (worker) => _WorkerListTile(
                                       worker: worker,
                                       travelFeeLabel: _travelFeeLabel(worker),
-                                      showOfferTag: true,
                                       onFavoriteTap: () =>
                                           _favoriteService.toggleFavorite(
                                             worker.id,
                                             worker.isFavorite,
                                           ),
-                                      onTap: () => _goToWorkerProfile(worker),
+                                      onTap: () =>
+                                          _openWorkerRequestScreen(worker),
                                     ),
                                   ),
                               ] else ...[
@@ -618,8 +625,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-              ),
-            );
+              ), // SafeArea
+            ); // AnnotatedRegion
           },
         );
       },
@@ -665,10 +672,9 @@ class _HomeScreenState extends State<HomeScreen> {
             (worker) => _WorkerListTile(
               worker: worker,
               travelFeeLabel: _travelFeeLabel(worker),
-              showOfferTag: false,
               onFavoriteTap: () =>
                   _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
-              onTap: () => _goToWorkerProfile(worker),
+              onTap: () => _openWorkerRequestScreen(worker),
             ),
           )
           .toList(),
@@ -684,10 +690,9 @@ class _HomeScreenState extends State<HomeScreen> {
             (worker) => _OfferTile(
               worker: worker,
               travelFeeLabel: _travelFeeLabel(worker),
-              offerBadgeLabel: _offerBadgeLabel(worker),
               onFavoriteTap: () =>
                   _favoriteService.toggleFavorite(worker.id, worker.isFavorite),
-              onTap: () => _goToWorkerProfile(worker),
+              onTap: () => _openWorkerRequestScreen(worker),
             ),
           )
           .toList(),
@@ -715,14 +720,14 @@ class _HomeScreenState extends State<HomeScreen> {
           preview[index].id,
           preview[index].isFavorite,
         ),
-        onTap: () => _goToWorkerProfile(preview[index]),
+        onTap: () => _openWorkerRequestScreen(preview[index]),
       ),
     );
   }
 }
 
 // ═══════════════════════════════════════════════
-//  Fee Row
+//  Fee Row (bottom sheet helper)
 // ═══════════════════════════════════════════════
 class _FeeRow extends StatelessWidget {
   final IconData icon;
@@ -1127,14 +1132,12 @@ class _FilterChipWidget extends StatelessWidget {
 class _WorkerListTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
-  final bool showOfferTag;
   final VoidCallback onFavoriteTap;
   final VoidCallback onTap;
 
   const _WorkerListTile({
     required this.worker,
     required this.travelFeeLabel,
-    required this.showOfferTag,
     required this.onFavoriteTap,
     required this.onTap,
   });
@@ -1151,58 +1154,50 @@ class _WorkerListTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CircleAvatar(
-              radius: 27,
-              backgroundColor: const Color(0xFFE6EAF7),
-              backgroundImage: worker.profilePhotoUrl.isNotEmpty
-                  ? NetworkImage(worker.profilePhotoUrl)
-                  : null,
-              child: worker.profilePhotoUrl.isEmpty
-                  ? const Icon(Icons.person, size: 26, color: Color(0xFF5B6475))
-                  : null,
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 27,
+                  backgroundColor: const Color(0xFFE6EAF7),
+                  backgroundImage: worker.profilePhotoUrl.isNotEmpty
+                      ? NetworkImage(worker.profilePhotoUrl)
+                      : null,
+                  child: worker.profilePhotoUrl.isEmpty
+                      ? const Icon(
+                          Icons.person,
+                          size: 26,
+                          color: Color(0xFF5B6475),
+                        )
+                      : null,
+                ),
+                if (worker.hasOffer)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 13),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          worker.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1F2E),
-                          ),
-                        ),
-                      ),
-                      if (showOfferTag && worker.hasOffer) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFEBEB),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'OFFER',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFFE53935),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    worker.name,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1F2E),
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -1214,55 +1209,32 @@ class _WorkerListTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // Travel fee — calculated from customer↔worker distance
                   Row(
                     children: [
                       const Icon(
-                        Icons.directions_car_outlined,
-                        size: 12,
-                        color: Color(0xFF9AA3B4),
+                        Icons.star_rounded,
+                        size: 14,
+                        color: Colors.amber,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Text(
-                        'Travel fee $travelFeeLabel',
+                        worker.rating.toStringAsFixed(1),
                         style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF555555),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1F2E),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      // Only show star + rating if rating > 0
-                      if (worker.rating > 0) ...[
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: Colors.amber,
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFCBD0DC),
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 3),
-                        Text(
-                          worker.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1F2E),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFCBD0DC),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
+                      ),
+                      const SizedBox(width: 8),
                       Text(
                         '${worker.distanceKm.toStringAsFixed(1)} km',
                         style: const TextStyle(
@@ -1458,44 +1430,19 @@ class _WorkerCard extends StatelessWidget {
               worker.category,
               style: const TextStyle(fontSize: 11.5, color: Color(0xFF9AA3B4)),
             ),
-            const SizedBox(height: 5),
-            // Travel fee
-            Row(
-              children: [
-                const Icon(
-                  Icons.directions_car_outlined,
-                  size: 11,
-                  color: Color(0xFF9AA3B4),
-                ),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Text(
-                    travelFeeLabel,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF555555),
-                    ),
-                  ),
-                ),
-              ],
-            ),
             const Spacer(),
             Row(
               children: [
-                if (worker.rating > 0) ...[
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                  const SizedBox(width: 3),
-                  Text(
-                    worker.rating.toStringAsFixed(1),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1F2E),
-                    ),
+                const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                const SizedBox(width: 3),
+                Text(
+                  worker.rating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1F2E),
                   ),
-                ],
+                ),
                 const Spacer(),
                 Text(
                   '${worker.distanceKm.toStringAsFixed(1)} km',
@@ -1515,31 +1462,29 @@ class _WorkerCard extends StatelessWidget {
 
 // ═══════════════════════════════════════════════
 //  Offer Tile
-//  Shows the actual travel fee amount instead of
-//  the generic "Travel fee included" text.
 // ═══════════════════════════════════════════════
 class _OfferTile extends StatelessWidget {
   final Worker worker;
-  final String travelFeeLabel; // e.g. "LKR 0" or "LKR 450"
-  final String offerBadgeLabel;
+  final String travelFeeLabel;
   final VoidCallback onFavoriteTap;
   final VoidCallback onTap;
 
   const _OfferTile({
     required this.worker,
     required this.travelFeeLabel,
-    required this.offerBadgeLabel,
     required this.onFavoriteTap,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isFreeTravel = worker.offerType == 'Free Travel';
-    final badgeColor = isFreeTravel
+    final offerBadge = worker.offerType == 'free_travel'
+        ? 'FREE TRAVEL'
+        : 'OFFER';
+    final badgeColor = worker.offerType == 'free_travel'
         ? const Color(0xFF2E7D32)
-        : const Color(0xFFE53935);
-    final badgeBg = isFreeTravel
+        : Colors.redAccent;
+    final badgeBg = worker.offerType == 'free_travel'
         ? const Color(0xFFE8F5E9)
         : const Color(0xFFFFEBEB);
 
@@ -1551,7 +1496,7 @@ class _OfferTile extends StatelessWidget {
           border: Border(bottom: BorderSide(color: Color(0xFFF0F2F8))),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             CircleAvatar(
               radius: 27,
@@ -1584,56 +1529,24 @@ class _OfferTile extends StatelessWidget {
                       color: Color(0xFF9AA3B4),
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  // Travel fee calculated from customer↔worker distance
+                  const SizedBox(height: 5),
                   Row(
                     children: [
                       const Icon(
-                        Icons.directions_car_outlined,
-                        size: 12,
-                        color: Color(0xFF9AA3B4),
+                        Icons.star_rounded,
+                        size: 14,
+                        color: Colors.amber,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Text(
-                        'Travel fee $travelFeeLabel',
+                        worker.rating.toStringAsFixed(1),
                         style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF555555),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1F2E),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Rating + distance
-                  Row(
-                    children: [
-                      if (worker.rating > 0) ...[
-                        const Icon(
-                          Icons.star_rounded,
-                          size: 14,
-                          color: Colors.amber,
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          worker.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1F2E),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 3,
-                          height: 3,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFCBD0DC),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
+                      const SizedBox(width: 8),
                       Text(
                         '${worker.distanceKm.toStringAsFixed(1)} km • ${worker.travelMinutes} min',
                         style: const TextStyle(
@@ -1647,7 +1560,6 @@ class _OfferTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Right column: offer badge on top, fav button below
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1661,7 +1573,7 @@ class _OfferTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
-                    offerBadgeLabel,
+                    offerBadge,
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,

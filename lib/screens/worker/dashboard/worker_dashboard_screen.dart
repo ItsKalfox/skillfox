@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../home/worker_home_screen.dart';
 import '../community/worker_community_feed_screen.dart';
 import '../search/worker_search_screen.dart';
-import '../bookings/worker_bookings_screen.dart';
+import '../../category_a/inspection_form_screen.dart';
+import '../../../models/worker.dart';
 import '../profile/worker_profile_screen.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
@@ -15,12 +16,30 @@ class WorkerDashboardScreen extends StatefulWidget {
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   int _currentIndex = 0;
 
-  // For now all tabs use same screen
-  final List<Widget> _screens = const [
+  List<Widget> get _screens => const [
     WorkerHomeScreen(),
     WorkerCommunityFeedScreen(),
     WorkerSearchScreen(),
-    WorkerBookingsScreen(),
+    InspectionFormScreen(
+      worker: Worker(
+        id: 'dummy',
+        name: 'Current Worker',
+        category: 'Plumber',
+        rating: 5.0,
+        ratingCount: 0,
+        completedJobsCount: 0,
+        distanceKm: 0.0,
+        travelMinutes: 0,
+        travelFee: 0.0,
+        hasOffer: false,
+        offerType: '',
+        isFeatured: false,
+        featuredWeekKey: '',
+        isFavorite: false,
+        profilePhotoUrl: '',
+        address: '',
+      ),
+    ),
     WorkerProfileScreen(),
   ];
 

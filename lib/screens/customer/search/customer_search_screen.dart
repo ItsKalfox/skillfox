@@ -51,6 +51,10 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     ('Caregiver', Icons.health_and_safety_rounded),
     ('Mason', Icons.construction_rounded),
     ('Handyman', Icons.handyman_rounded),
+    ('Painter', Icons.format_paint_rounded),
+    ('Gardener', Icons.local_florist_rounded),
+    ('Driver', Icons.directions_car_rounded),
+    ('IT Support', Icons.computer_rounded),
   ];
 
   // ── Design tokens ─────────────────────────────────────────────────

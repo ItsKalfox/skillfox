@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-class CustomerDetailScreen extends StatefulWidget {
+class WorkerDetailScreen extends StatefulWidget {
   final Map<String, dynamic> request;
 
-  const CustomerDetailScreen({super.key, required this.request});
+  const WorkerDetailScreen({super.key, required this.request});
 
   @override
-  State<CustomerDetailScreen> createState() => _CustomerDetailScreenState();
+  State<WorkerDetailScreen> createState() => _WorkerDetailScreenState();
 }
 
-class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
+class _WorkerDetailScreenState extends State<WorkerDetailScreen> {
   GoogleMapController? _mapController;
 
   @override

@@ -174,7 +174,7 @@ class CustomerHelpScreen extends StatelessWidget {
                             iconBg: Color(0xFFE0F4F1),
                             title: 'How booking works',
                             content:
-                                'Open a worker profile and tap "Request". Fill in the details about your service request and submit. The worker will be notified and can accept or decline. Once accepted, you will receive a confirmation and can track the status from your booking history.',
+                                'Open a worker profile and tap "Book Now". Fill in the details about your service request and submit. The worker will be notified and can accept or decline. Once accepted, you will receive a confirmation and can track the status from your booking history.',
                           ),
                           _HelpTileData(
                             icon: Icons.history_rounded,
@@ -183,6 +183,14 @@ class CustomerHelpScreen extends StatelessWidget {
                             title: 'Viewing your booking history',
                             content:
                                 'Go to the Profile tab and tap "History" to see all your past and upcoming bookings. Each entry shows the worker name, service type, date, and current status. You can tap any booking to view more details.',
+                          ),
+                          _HelpTileData(
+                            icon: Icons.cancel_outlined,
+                            iconColor: Color(0xFFE53935),
+                            iconBg: Color(0xFFFFEBEB),
+                            title: 'Cancelling a booking',
+                            content:
+                                'You can cancel a booking from your booking history before the worker has started travelling to your location. Open the booking and tap the cancel option. Please note that cancelling frequently may affect your standing on the platform.',
                           ),
                         ],
                       ),

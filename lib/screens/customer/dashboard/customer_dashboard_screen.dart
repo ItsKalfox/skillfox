@@ -35,8 +35,8 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
 
   Future<void> _resolveLocation() async {
     // 1️⃣ Try default saved address first
-    final UserAddress? defaultAddress =
-        await _addressService.getDefaultAddress();
+    final UserAddress? defaultAddress = await _addressService
+        .getDefaultAddress();
 
     if (defaultAddress?.location != null) {
       setState(() {
@@ -61,9 +61,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   Widget build(BuildContext context) {
     // Show loading until location is resolved
     if (!_locationLoaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Fallback coords (Colombo) if location is unavailable
@@ -73,10 +71,7 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
     final List<Widget> screens = [
       const HomeScreen(),
       const CustomerCommunityFeedScreen(),
-      CustomerSearchScreen(
-        customerLat: lat,
-        customerLng: lng,
-      ),
+      CustomerSearchScreen(customerLat: lat, customerLng: lng),
       const CustomerBookingsScreen(),
       const CustomerProfileScreen(),
     ];
