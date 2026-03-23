@@ -13,17 +13,14 @@ class WorkerProfileScreen extends StatefulWidget {
 class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Worker get w => widget.worker;
 
-  // ── state ─────────────────────────────────────────────────────────
   Map<String, dynamic> _doc = {};
   List<Map<String, dynamic>> _reviews = [];
   bool _loading = true;
   bool _reviewsLoading = true;
 
-  // ── pagination ────────────────────────────────────────────────────
   int _page = 0;
   static const _perPage = 3;
 
-  // ── design tokens ─────────────────────────────────────────────────
   static const _grad = [
     Color(0xFF469FEF),
     Color(0xFF5C75F0),
@@ -38,21 +35,39 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   static const _white = Colors.white;
   static const _green = Color(0xFF27C840);
 
-  // avatar straddles the banner/card seam by half its height
   static const _avatarDiameter = 90.0;
-  static const _avatarOverlap = _avatarDiameter / 2; // 45px
+  static const _avatarOverlap = _avatarDiameter / 2;
 
-  // ── safe field reads ──────────────────────────────────────────────
+  // ── Field readers (Firestore → Worker model fallback) ─────────────
   String get _name => _str('name') ?? w.name;
   String get _jobType => _str('jobType') ?? w.category;
   String get _about => _str('about') ?? '';
   String get _experience => _str('experience') ?? '';
-  bool get _isAvailable => (_doc['isAvailable'] as bool?) ?? false;
-  String get _photo => _str('profilePhotoUrl') ?? w.profilePhotoUrl;
-  double get _rating => (_doc['rating'] as num?)?.toDouble() ?? w.rating;
+
+  // Firestore has both profileImageUrl and profilePhotoUrl — prefer profileImageUrl
+  String get _photo =>
+      _str('profileImageUrl') ?? _str('profilePhotoUrl') ?? w.profilePhotoUrl;
+
+  // coverPhotoUrl is the wide banner photo
+  String get _coverPhoto => _str('coverPhotoUrl') ?? _photo;
+
+  bool get _isAvailable =>
+      (_doc['isAvailable'] as bool?) ?? true; // default true for active workers
+  double get _rating =>
+      (_doc['ratingAverage'] as num?)?.toDouble() ??
+      (_doc['rating'] as num?)?.toDouble() ??
+      w.rating;
   int get _ratingCount =>
       (_doc['ratingCount'] as num?)?.toInt() ?? w.ratingCount;
 
+  bool get _hasOffer => (_doc['hasOffer'] as bool?) ?? w.hasOffer;
+  String get _offerType => _str('offerType') ?? w.offerType;
+  String get _offerDetails => _str('offerDetails') ?? w.offerDetails;
+  double get _travelFee =>
+      (_doc['travelFee'] as num?)?.toDouble() ?? w.travelFee;
+  bool get _isFreeTravel => _offerType == 'Free Travel';
+
+  // Simple null-if-blank reader — no dummy-text filtering
   String? _str(String key) {
     final v = _doc[key]?.toString().trim();
     return (v == null || v.isEmpty) ? null : v;
@@ -95,9 +110,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     return _reviews.sublist(s, (s + _perPage).clamp(0, _reviews.length));
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  //  LIFECYCLE
-  // ══════════════════════════════════════════════════════════════════
+  // ── Firestore loading ─────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -109,7 +122,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     Map<String, dynamic>? found;
     String? foundId;
 
-    // Strategy 1: direct doc ID
+    // 1: direct doc ID
     try {
       final snap = await col
           .doc(w.id)
@@ -120,7 +133,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       }
     } catch (_) {}
 
-    // Strategy 2: uid field
+    // 2: uid field
     if (found == null) {
       try {
         final q = await col
@@ -134,7 +147,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       } catch (_) {}
     }
 
-    // Strategy 3: name field
+    // 3: name field
     if (found == null && w.name.isNotEmpty) {
       try {
         final q = await col
@@ -179,9 +192,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     }
   }
 
-  // ══════════════════════════════════════════════════════════════════
-  //  BUILD
-  // ══════════════════════════════════════════════════════════════════
+  // ── Build ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -190,7 +201,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         children: [
           CustomScrollView(
             slivers: [
-              // ── Hero banner with avatar on seam ──────────────────
               SliverAppBar(
                 expandedHeight: 210,
                 pinned: true,
@@ -206,8 +216,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                   ),
                   onPressed: () => Navigator.pop(context),
                 ),
-                // bottom slot renders below the flexible space and is NOT
-                // clipped — perfect place to hang the avatar on the seam.
                 bottom: PreferredSize(
                   preferredSize: Size.fromHeight(_avatarOverlap),
                   child: Transform.translate(
@@ -253,15 +261,13 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Banner photo
-                      _photo.isNotEmpty
+                      _coverPhoto.isNotEmpty
                           ? Image.network(
-                              _photo,
+                              _coverPhoto,
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => _gradBox(),
                             )
                           : _gradBox(),
-                      // Dark overlay for back button readability
                       DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -279,8 +285,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                   ),
                 ),
               ),
-
-              // ── Profile header + all content ─────────────────────
               SliverToBoxAdapter(
                 child: _loading
                     ? const SizedBox(
@@ -291,8 +295,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
               ),
             ],
           ),
-
-          // ── Sticky Request button ────────────────────────────────
           _buildRequestButton(context),
         ],
       ),
@@ -310,7 +312,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     ),
   );
 
-  // ── Full body ─────────────────────────────────────────────────────
+  // ── Body ──────────────────────────────────────────────────────────
   Widget _buildBody() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,11 +320,16 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         _buildProfileHeader(),
         _hline(),
 
-        // ABOUT
-        Padding(
-          padding: const EdgeInsets.fromLTRB(33, 14, 33, 14),
-          child: _about.isNotEmpty
-              ? Text(
+        // ABOUT — shown only when Firestore has content
+        if (_about.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(33, 14, 33, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _lbl('About'),
+                const SizedBox(height: 6),
+                Text(
                   _about,
                   style: const TextStyle(
                     fontFamily: 'Poppins',
@@ -330,10 +337,15 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                     height: 1.82,
                     color: _ink,
                   ),
-                )
-              : _ph('No bio added yet.'),
-        ),
-        _hline(),
+                ),
+              ],
+            ),
+          ),
+          _hline(),
+        ],
+
+        // OFFER
+        if (_hasOffer) ...[_buildOfferSection(), _hline()],
 
         // CERTIFICATIONS
         Padding(
@@ -555,11 +567,101 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     );
   }
 
+  // ── Offer section ─────────────────────────────────────────────────
+  Widget _buildOfferSection() {
+    final badgeColor = _isFreeTravel
+        ? const Color(0xFF2E7D32)
+        : const Color(0xFFE53935);
+    final badgeBg = _isFreeTravel
+        ? const Color(0xFFE8F5E9)
+        : const Color(0xFFFFEBEB);
+    final borderColor = _isFreeTravel
+        ? const Color(0xFFA5D6A7)
+        : const Color(0xFFFFCDD2);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: badgeBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isFreeTravel
+                        ? Icons.directions_car_outlined
+                        : Icons.local_offer_rounded,
+                    size: 16,
+                    color: badgeColor,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  _isFreeTravel ? 'Free Travel Offer' : 'Special Offer',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: badgeColor,
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1, color: borderColor),
+            ),
+            _OfferDetailRow(
+              icon: Icons.directions_car_outlined,
+              label: 'Travel Fee',
+              value: _isFreeTravel
+                  ? 'Free  (LKR 0)'
+                  : 'LKR ${_travelFee.toStringAsFixed(0)}',
+              valueColor: _isFreeTravel ? const Color(0xFF2E7D32) : _muted,
+            ),
+            if (!_isFreeTravel && _offerType.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _OfferDetailRow(
+                icon: Icons.sell_outlined,
+                label: 'Offer Type',
+                value: _offerType,
+                valueColor: badgeColor,
+              ),
+            ],
+            if (_offerDetails.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _OfferDetailRow(
+                icon: Icons.confirmation_num_outlined,
+                label: 'Details',
+                value: _offerDetails,
+                valueColor: badgeColor,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Profile header ────────────────────────────────────────────────
   Widget _buildProfileHeader() {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // White card — top padding makes room for the avatar hanging down from banner
         Container(
           width: double.infinity,
           color: _white,
@@ -589,8 +691,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             ],
           ),
         ),
-
-        // Rating + distance — left side
         Positioned(
           top: 10,
           left: 19,
@@ -625,8 +725,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             ],
           ),
         ),
-
-        // Available badge — right side
         Positioned(
           top: 10,
           right: 19,
@@ -720,7 +818,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     ),
   );
 
-  // ── Sticky Request button ─────────────────────────────────────────
+  // ── Sticky request button ─────────────────────────────────────────
   Widget _buildRequestButton(BuildContext ctx) => Positioned(
     left: 0,
     right: 0,
@@ -876,6 +974,51 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     if (d.inDays < 30) return '${(d.inDays / 7).floor()} weeks ago';
     if (d.inDays < 365) return '${(d.inDays / 30).floor()} months ago';
     return '${(d.inDays / 365).floor()} years ago';
+  }
+}
+
+// ── Offer Detail Row ──────────────────────────────────────────────────
+class _OfferDetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  const _OfferDetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 13, color: valueColor.withOpacity(0.7)),
+        const SizedBox(width: 7),
+        Text(
+          '$label:',
+          style: const TextStyle(
+            fontFamily: 'Poppins',
+            fontSize: 10,
+            color: Color(0xFF727272),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: valueColor,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

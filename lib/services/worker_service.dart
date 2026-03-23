@@ -33,8 +33,8 @@ class WorkerService {
   }) {
     return _firestore
         .collection('users')
-        .where('role', isEqualTo: 'worker')
         .where('status', isEqualTo: 'active')
+        .where('role', isEqualTo: 'worker')
         .snapshots()
         .map((snapshot) {
           final workers = <Worker>[];
@@ -45,21 +45,21 @@ class WorkerService {
             final geoPoint = data['location'];
             if (geoPoint is! GeoPoint) continue;
 
+            // Pre-filter: skip workers outside 30 km range
             final distanceKm = _locationService.calculateDistanceKm(
               startLat: customerLat,
               startLng: customerLng,
               endLat: geoPoint.latitude,
               endLng: geoPoint.longitude,
             );
+            if (distanceKm > 30) continue;
 
             final bool hasOffer = _toBool(data['hasOffer'], fallback: false);
-            final String offerType = (data['offerType'] ?? 'none').toString();
+            final String offerType = (data['offerType'] ?? '').toString();
+            final String offerDetails = (data['offerDetails'] ?? '').toString();
 
             double travelFee = _locationService.calculateTravelFee(distanceKm);
-
-            if (hasOffer && offerType == 'free_travel') {
-              travelFee = 0;
-            }
+            if (hasOffer && offerType == 'Free Travel') travelFee = 0;
 
             final travelMinutes = _locationService.estimateTravelMinutes(
               distanceKm,
@@ -70,7 +70,12 @@ class WorkerService {
                 id: doc.id,
                 name: (data['name'] ?? 'Unknown Worker').toString(),
                 category: (data['jobType'] ?? 'Unknown').toString(),
-                rating: _toDouble(data['ratingAverage'], fallback: 4.5),
+                // fallback 0.0 — no dummy rating for new workers
+                // Firestore field is 'ratingAverage', not 'rating'
+                rating: _toDouble(
+                  data['ratingAverage'] ?? data['rating'],
+                  fallback: 0.0,
+                ),
                 ratingCount: _toInt(data['ratingCount'], fallback: 0),
                 completedJobsCount: _toInt(
                   data['completedJobsCount'],
@@ -81,11 +86,14 @@ class WorkerService {
                 travelFee: travelFee,
                 hasOffer: hasOffer,
                 offerType: offerType,
+                offerDetails: offerDetails,
                 isFeatured: _toBool(data['isFeatured'], fallback: false),
                 featuredWeekKey: (data['featuredWeekKey'] ?? '').toString(),
                 isFavorite: false,
                 profilePhotoUrl: (data['profilePhotoUrl'] ?? '').toString(),
                 address: (data['address'] ?? '').toString(),
+                lat: _toDouble(data['lat']),
+                lng: _toDouble(data['lng']),
               ),
             );
           }
