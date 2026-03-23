@@ -1,0 +1,101 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+#.vscode/
+
+# ============================================================
+# MOBILE APP
+# ============================================================
+
+# Flutter/Dart/Pub related
+**/doc/api/
+mobile/ios/Flutter/.last_build_id
+mobile/.dart_tool/
+mobile/.flutter-plugins-dependencies
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio build artifacts
+mobile/android/app/debug
+mobile/android/app/profile
+mobile/android/app/release
+
+# Flutter generated Linux files
+mobile/linux/flutter/generated_plugin_registrant.cc
+mobile/linux/flutter/generated_plugin_registrant.h
+mobile/linux/flutter/generated_plugins.cmake
+mobile/linux/flutter/generated_*
+
+# Flutter generated macOS files
+mobile/macos/Flutter/GeneratedPluginRegistrant.swift
+mobile/macos/Flutter/GeneratedPluginRegistrant.h
+
+# Flutter generated Windows files
+mobile/windows/flutter/generated_plugin_registrant.cc
+mobile/windows/flutter/generated_plugin_registrant.h
+mobile/windows/flutter/generated_plugins.cmake
+mobile/windows/flutter/generated_*
+
+mobile/pubspec.lock
+mobile/.idea/
+
+# ============================================================
+# WEB ADMIN APP
+# ============================================================
+
+# Flutter/Dart/Pub related
+webapp/ios/Flutter/.last_build_id
+webapp/.dart_tool/
+webapp/.flutter-plugins-dependencies
+webapp/.pub-cache/
+webapp/.pub/
+webapp/build/
+webapp/coverage/
+
+# Android Studio build artifacts
+webapp/android/app/debug
+webapp/android/app/profile
+webapp/android/app/release
+
+# Flutter generated Linux files
+webapp/linux/flutter/generated_plugin_registrant.cc
+webapp/linux/flutter/generated_plugin_registrant.h
+webapp/linux/flutter/generated_plugins.cmake
+webapp/linux/flutter/generated_*
+
+# Flutter generated macOS files
+webapp/macos/Flutter/GeneratedPluginRegistrant.swift
+webapp/macos/Flutter/GeneratedPluginRegistrant.h
+
+# Flutter generated Windows files
+webapp/windows/flutter/generated_plugin_registrant.cc
+webapp/windows/flutter/generated_plugin_registrant.h
+webapp/windows/flutter/generated_plugins.cmake
+webapp/windows/flutter/generated_*
+
+webapp/pubspec.lock
+webapp/.idea/
