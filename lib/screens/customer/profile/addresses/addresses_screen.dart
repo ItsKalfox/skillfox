@@ -144,7 +144,6 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
         bottom: false,
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
               child: Row(
@@ -183,7 +182,6 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
               ),
             ),
 
-            // ── Search bar ───────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
               child: Container(
@@ -237,7 +235,6 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
               ),
             ),
 
-            // ── Body card ───────────────────────────────
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -352,7 +349,6 @@ class _CustomerAddressesScreenState extends State<CustomerAddressesScreen> {
                       ),
                     ),
 
-                    // ── Add new address button ─────────────
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       child: GradientButton(

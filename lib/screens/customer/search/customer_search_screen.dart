@@ -31,17 +31,13 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
   String selectedCategory = 'All';
   String sortOption = 'Rating';
 
-  // Map visibility
   bool _mapVisible = true;
   late AnimationController _mapAnimController;
   late Animation<double> _mapHeightAnim;
   late Animation<double> _mapOpacityAnim;
-
-  // Page fade
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // ── Categories ────────────────────────────────────────────────────
   static const _categories = [
     ('All', Icons.apps_rounded),
     ('Mechanic', Icons.build_rounded),
@@ -54,7 +50,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     ('Handyman', Icons.handyman_rounded),
   ];
 
-  // ── Design tokens ─────────────────────────────────────────────────
   static const _primaryBlue = Color(0xFF469FEF);
   static const _accentBlue = Color(0xFF5C75F0);
   static const _bgPage = Color(0xFFF5F7FA);
@@ -62,7 +57,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
   static const _textPrimary = Color(0xFF1A1D26);
   static const _textMuted = Color(0xFF8A919E);
   static const _borderColor = Color(0xFFEAECF0);
-  static const _amber = Color(0xFFF5A623);
   static const _green = Color(0xFF27C840);
 
   static const double _mapExpandedHeight = 200.0;
@@ -71,7 +65,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
   void initState() {
     super.initState();
 
-    // Page fade-in
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -82,11 +75,10 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
     _fadeController.forward();
 
-    // Map collapse/expand animation
     _mapAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
-      value: 1.0, // starts expanded
+      value: 1.0,
     );
     _mapHeightAnim = Tween<double>(begin: 0.0, end: _mapExpandedHeight).animate(
       CurvedAnimation(parent: _mapAnimController, curve: Curves.easeInOutCubic),
@@ -121,7 +113,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     }
   }
 
-  // ── Toggle map ────────────────────────────────────────────────────
   void _toggleMap() {
     setState(() => _mapVisible = !_mapVisible);
     if (_mapVisible) {
@@ -131,7 +122,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     }
   }
 
-  // ── Build markers from the current filtered worker list ───────────
   Set<Marker> _buildMarkers(List<Map<String, dynamic>> workers) {
     final Set<Marker> markers = {
       Marker(
@@ -162,7 +152,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     return markers;
   }
 
-  // ── Filtering + sorting ───────────────────────────────────────────
   List<Map<String, dynamic>> _applyFilters(List<Map<String, dynamic>> workers) {
     List<Map<String, dynamic>> filtered = workers.where((w) {
       final name = (w['name'] ?? '').toLowerCase();
@@ -182,7 +171,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     return filtered;
   }
 
-  // ── Navigation ────────────────────────────────────────────────────
   void _openFullMap(Set<Marker> markers) {
     Navigator.push(
       context,
@@ -244,7 +232,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -273,7 +260,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                 return {'snapshot': snapshot, 'searchRadius': searchRadius};
               }),
           builder: (context, snapshotData) {
-            // Compute distances once per snapshot
             List<Map<String, dynamic>> allWorkers = [];
             final isLoading = !snapshotData.hasData;
 
@@ -284,6 +270,7 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
 
               allWorkers = snapshot.docs.map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
+                data['uid'] = doc.id;
                 final GeoPoint? loc = data['location'];
                 data['distance'] = loc != null
                     ? _locationService.calculateDistanceKm(
@@ -319,7 +306,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── AppBar ────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: _bgCard,
@@ -342,7 +328,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Search bar ────────────────────────────────────────────────────
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -391,7 +376,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Category chips ────────────────────────────────────────────────
   Widget _buildCategoryChips() {
     return SizedBox(
       height: 38,
@@ -459,7 +443,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Sort row + map toggle ─────────────────────────────────────────
   Widget _buildSortAndToggleRow(int count) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -474,7 +457,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
           const SizedBox(width: 6),
           _sortChip('Nearest', Icons.near_me_rounded),
           const Spacer(),
-          // Map hide/show button
           GestureDetector(
             onTap: _toggleMap,
             child: AnimatedContainer(
@@ -544,7 +526,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Animated collapsible map ──────────────────────────────────────
   Widget _buildAnimatedMap(
     Set<Marker> markers,
     int workerCount,
@@ -570,7 +551,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                   ),
                   child: Stack(
                     children: [
-                      // Fully interactive Google Map
                       GoogleMap(
                         initialCameraPosition: CameraPosition(
                           target: LatLng(
@@ -581,7 +561,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                         ),
                         markers: markers,
                         onMapCreated: (ctrl) => _mapController = ctrl,
-                        // All gestures enabled
                         scrollGesturesEnabled: true,
                         zoomGesturesEnabled: true,
                         rotateGesturesEnabled: true,
@@ -591,7 +570,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                         liteModeEnabled: false,
                       ),
 
-                      // Status pill — top left
                       Positioned(
                         top: 10,
                         left: 10,
@@ -654,14 +632,12 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                         ),
                       ),
 
-                      // Controls — bottom right
                       Positioned(
                         bottom: 10,
                         right: 10,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Re-centre on user
                             _mapIconBtn(
                               icon: Icons.my_location_rounded,
                               onTap: () {
@@ -676,7 +652,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                               },
                             ),
                             const SizedBox(height: 6),
-                            // Open full-screen map
                             _mapIconBtn(
                               icon: Icons.fullscreen_rounded,
                               onTap: () => _openFullMap(markers),
@@ -717,7 +692,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 
-  // ── Worker list ───────────────────────────────────────────────────
   Widget _buildWorkerList(List<Map<String, dynamic>> filtered, bool isLoading) {
     if (isLoading) {
       return const Center(
@@ -769,10 +743,6 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Worker Card
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _WorkerCard extends StatefulWidget {
   final Map<String, dynamic> data;
@@ -860,7 +830,6 @@ class _WorkerCardState extends State<_WorkerCard>
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                // Avatar with availability dot
                 Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -1009,9 +978,6 @@ class _WorkerCardState extends State<_WorkerCard>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Full Screen Map
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _FullMapScreen extends StatelessWidget {
   final double customerLat;

@@ -65,7 +65,6 @@ class ManageAccountScreen extends StatelessWidget {
 
           return Column(
             children: [
-              // ── Gradient Header ────────────────────────
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(16, 52, 16, 80),
@@ -79,7 +78,6 @@ class ManageAccountScreen extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Back button
                     Align(
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
@@ -112,7 +110,6 @@ class ManageAccountScreen extends StatelessWidget {
                 ),
               ),
 
-              // ── White body ─────────────────────────────
               Expanded(
                 child: Container(
                   width: double.infinity,
@@ -120,7 +117,6 @@ class ManageAccountScreen extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // Blue top slice behind avatar
                       Positioned(
                         top: 0,
                         left: 0,
@@ -137,7 +133,6 @@ class ManageAccountScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // Main card
                       Positioned.fill(
                         top: 62,
                         child: Container(
@@ -150,17 +145,14 @@ class ManageAccountScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // Content
                       SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
                         child: Column(
                           children: [
-                            // Avatar floating on the seam
                             Transform.translate(
                               offset: const Offset(0, -52),
                               child: Column(
                                 children: [
-                                  // Avatar with ring
                                   Container(
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
@@ -230,7 +222,6 @@ class ManageAccountScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 28),
 
-                                  // ── Section label ────────────────
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Padding(
@@ -250,7 +241,6 @@ class ManageAccountScreen extends StatelessWidget {
                                     ),
                                   ),
 
-                                  // ── Option Cards ─────────────────
                                   Row(
                                     children: [
                                       Expanded(
@@ -305,7 +295,6 @@ class ManageAccountScreen extends StatelessWidget {
 
                                   const SizedBox(height: 24),
 
-                                  // ── Info tiles ───────────────────
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Padding(
@@ -382,7 +371,6 @@ class ManageAccountScreen extends StatelessWidget {
                                   ),
                                   const SizedBox(height: 24),
 
-                                  // ── Preferences ──────────────────
                                   const Align(
                                     alignment: Alignment.centerLeft,
                                     child: Padding(
@@ -424,9 +412,6 @@ class ManageAccountScreen extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Account Option Card
-// ═══════════════════════════════════════════════
 class _AccountOptionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -486,9 +471,6 @@ class _AccountOptionCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Info Tile
-// ═══════════════════════════════════════════════
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -551,9 +533,6 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Distance Limit Slider
-// ═══════════════════════════════════════════════
 class _DistanceLimitSlider extends StatefulWidget {
   final String userId;
   final double initialValue;
@@ -674,4 +653,3 @@ class _DistanceLimitSliderState extends State<_DistanceLimitSlider> {
     );
   }
 }
-

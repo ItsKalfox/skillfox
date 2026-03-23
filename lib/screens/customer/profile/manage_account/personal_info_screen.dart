@@ -249,7 +249,6 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
         opacity: _fadeAnimation,
         child: CustomScrollView(
           slivers: [
-            // ── Header ──────────────────────────────────────────
             SliverAppBar(
               expandedHeight: 220,
               pinned: true,
@@ -281,14 +280,12 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
               ),
             ),
 
-            // ── Form ────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 24, 18, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Section label
                     const Padding(
                       padding: EdgeInsets.only(left: 4, bottom: 14),
                       child: Text(
@@ -302,7 +299,6 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
                       ),
                     ),
 
-                    // Name field
                     _ProField(
                       label: 'Full Name',
                       icon: Icons.person_outline_rounded,
@@ -314,7 +310,6 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // Phone field
                     _ProField(
                       label: 'Phone Number',
                       icon: Icons.phone_outlined,
@@ -325,7 +320,6 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // Email field (read-only)
                     _ProField(
                       label: 'Email Address',
                       icon: Icons.mail_outline_rounded,
@@ -371,9 +365,6 @@ class _CustomerPersonalInfoScreenState extends State<CustomerPersonalInfoScreen>
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Header Banner
-// ═══════════════════════════════════════════════
 class _HeaderBanner extends StatelessWidget {
   final ImageProvider? profileImage;
   final bool isUploadingPhoto;
@@ -403,11 +394,9 @@ class _HeaderBanner extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             const SizedBox(height: 8),
-            // Avatar
             Stack(
               alignment: Alignment.center,
               children: [
-                // Outer glow ring
                 Container(
                   width: 100,
                   height: 100,
@@ -431,7 +420,6 @@ class _HeaderBanner extends StatelessWidget {
                         )
                       : null,
                 ),
-                // Camera button
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -496,9 +484,6 @@ class _HeaderBanner extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Professional Field
-// ═══════════════════════════════════════════════
 class _ProField extends StatefulWidget {
   final String label;
   final IconData icon;

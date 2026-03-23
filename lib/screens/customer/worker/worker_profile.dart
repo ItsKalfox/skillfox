@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../models/worker.dart';
+import 'package:skillfox/screens/category_a/inspection_form_screen.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
   final Worker worker;
@@ -818,6 +819,24 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     ),
   );
 
+  bool _isCategoryAWorker(Worker worker) {
+    const categoryA = {'plumber', 'electrician', 'mechanic'};
+    return categoryA.contains(worker.category.toLowerCase());
+  }
+
+  void _openRequestFlow(BuildContext ctx) {
+    if (_isCategoryAWorker(w)) {
+      Navigator.push(
+        ctx,
+        MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: w)),
+      );
+    } else {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        const SnackBar(content: Text('Request Service temporarily unavailable for this category.')),
+      );
+    }
+  }
+
   // ── Sticky request button ─────────────────────────────────────────
   Widget _buildRequestButton(BuildContext ctx) => Positioned(
     left: 0,
@@ -848,9 +867,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         child: SizedBox(
           height: 50,
           child: ElevatedButton(
-            onPressed: () => ScaffoldMessenger.of(ctx).showSnackBar(
-              const SnackBar(content: Text('Opening Request Service…')),
-            ),
+            onPressed: () => _openRequestFlow(ctx),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,

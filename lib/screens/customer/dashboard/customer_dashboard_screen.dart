@@ -147,7 +147,6 @@ class SkillFoxBottomNavBar extends StatelessWidget {
               ),
               const SizedBox(width: 12),
 
-              // Search bar button
               Expanded(
                 child: GestureDetector(
                   onTap: () => onTap(2),

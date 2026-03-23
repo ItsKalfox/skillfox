@@ -64,16 +64,13 @@ class _SignInScreenState extends State<SignInScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // ✅ Layer 1 — gradient background fills entire screen
           Container(
             decoration: const BoxDecoration(gradient: AppColors.mainGradient),
           ),
 
-          // ✅ Layer 2 — main content inside SafeArea
           SafeArea(
             child: Column(
               children: [
-                // Nav bar
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -103,7 +100,6 @@ class _SignInScreenState extends State<SignInScreen> {
                     ],
                   ),
                 ),
-                // White card body
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.only(top: 8),
@@ -120,7 +116,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         left: 45,
                         right: 45,
                         bottom:
-                            120, // ✅ prevents content hiding behind bottom line
+                            120,
                       ),
                       child: Form(
                         key: _formKey,
@@ -144,7 +140,6 @@ class _SignInScreenState extends State<SignInScreen> {
                               ),
                             ),
                             const SizedBox(height: 40),
-                            // ✅ lock-clipart.png illustration
                             Center(
                               child: Image.asset(
                                 'assets/images/lock-clipart.png',
@@ -234,7 +229,6 @@ class _SignInScreenState extends State<SignInScreen> {
             ),
           ),
 
-          // ✅ Layer 3 — bottom line on top of everything, ignores SafeArea
           Positioned(
             bottom: 0,
             left: 0,

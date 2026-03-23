@@ -182,7 +182,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Returns the actual travel fee string for a worker
   String _travelFeeLabel(Worker worker) {
     if (worker.hasOffer && worker.offerType == 'Free Travel') {
       return 'LKR 0';
@@ -691,9 +690,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Fee Row
-// ═══════════════════════════════════════════════
 class _FeeRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -750,18 +746,12 @@ class _FeeRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Category Data
-// ═══════════════════════════════════════════════
 class _CategoryData {
   final String label;
   final String imagePath;
   const _CategoryData({required this.label, required this.imagePath});
 }
 
-// ═══════════════════════════════════════════════
-//  Home Header Card
-// ═══════════════════════════════════════════════
 class _HomeHeaderCard extends StatelessWidget {
   final List<_CategoryData> categories;
   final String selectedCategory;
@@ -961,9 +951,6 @@ class _HomeHeaderCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Section Header
-// ═══════════════════════════════════════════════
 class _SectionHeader extends StatelessWidget {
   final String title;
   final VoidCallback onSeeAll;
@@ -1020,9 +1007,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Filter Chip
-// ═══════════════════════════════════════════════
 class _FilterChipWidget extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -1091,9 +1075,6 @@ class _FilterChipWidget extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Worker List Tile
-// ═══════════════════════════════════════════════
 class _WorkerListTile extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
@@ -1184,7 +1165,6 @@ class _WorkerListTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  // Travel fee — calculated from customer↔worker distance
                   Row(
                     children: [
                       const Icon(
@@ -1206,7 +1186,6 @@ class _WorkerListTile extends StatelessWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      // Only show star + rating if rating > 0
                       if (worker.rating > 0) ...[
                         const Icon(
                           Icons.star_rounded,
@@ -1292,9 +1271,6 @@ class _WorkerListTile extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Worker Card (Grid)
-// ═══════════════════════════════════════════════
 class _WorkerCard extends StatelessWidget {
   final Worker worker;
   final String travelFeeLabel;
@@ -1429,7 +1405,6 @@ class _WorkerCard extends StatelessWidget {
               style: const TextStyle(fontSize: 11.5, color: Color(0xFF9AA3B4)),
             ),
             const SizedBox(height: 5),
-            // Travel fee
             Row(
               children: [
                 const Icon(
@@ -1483,14 +1458,9 @@ class _WorkerCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Offer Tile
-//  Shows the actual travel fee amount instead of
-//  the generic "Travel fee included" text.
-// ═══════════════════════════════════════════════
 class _OfferTile extends StatelessWidget {
   final Worker worker;
-  final String travelFeeLabel; // e.g. "LKR 0" or "LKR 450"
+  final String travelFeeLabel;
   final String offerBadgeLabel;
   final VoidCallback onFavoriteTap;
   final VoidCallback onTap;
@@ -1555,7 +1525,6 @@ class _OfferTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  // Travel fee calculated from customer↔worker distance
                   Row(
                     children: [
                       const Icon(
@@ -1578,7 +1547,6 @@ class _OfferTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Rating + distance
                   Row(
                     children: [
                       if (worker.rating > 0) ...[
@@ -1623,7 +1591,6 @@ class _OfferTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            // Right column: offer badge on top, fav button below
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -1678,9 +1645,6 @@ class _OfferTile extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Empty Section Text
-// ═══════════════════════════════════════════════
 class _EmptySectionText extends StatelessWidget {
   final String text;
   const _EmptySectionText({this.text = 'No workers found for this section'});

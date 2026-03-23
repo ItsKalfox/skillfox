@@ -116,7 +116,6 @@ class CustomerProfileScreen extends StatelessWidget {
                 ? data!['profileImageUrl'].toString().trim()
                 : (providerUser?['profilePhotoUrl'] ?? '').toString();
 
-            // First letter for avatar fallback
             final String initials = name.isNotEmpty
                 ? name.trim()[0].toUpperCase()
                 : '?';
@@ -126,7 +125,6 @@ class CustomerProfileScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Title ──────────────────────────────
                   const Text(
                     'My Profile',
                     style: TextStyle(
@@ -138,7 +136,6 @@ class CustomerProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Profile Hero Card ──────────────────
                   _ProfileHeroCard(
                     name: name,
                     email: email,
@@ -147,7 +144,6 @@ class CustomerProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // ── Quick Actions ──────────────────────
                   Row(
                     children: [
                       Expanded(
@@ -184,7 +180,6 @@ class CustomerProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
 
-                  // ── Settings Section ───────────────────
                   const Padding(
                     padding: EdgeInsets.only(left: 4, bottom: 12),
                     child: Text(
@@ -241,7 +236,6 @@ class CustomerProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 12),
 
-                  // ── Logout ─────────────────────────────
                   _LogoutButton(onTap: () => _logout(context)),
                 ],
               ),
@@ -253,9 +247,6 @@ class CustomerProfileScreen extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Profile Hero Card
-// ═══════════════════════════════════════════════
 class _ProfileHeroCard extends StatelessWidget {
   final String name;
   final String email;
@@ -290,7 +281,6 @@ class _ProfileHeroCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
@@ -319,7 +309,6 @@ class _ProfileHeroCard extends StatelessWidget {
           ),
           const SizedBox(width: 16),
 
-          // Name + email
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,7 +339,6 @@ class _ProfileHeroCard extends StatelessWidget {
             ),
           ),
 
-          // Verified badge
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -382,9 +370,6 @@ class _ProfileHeroCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Quick Action Card
-// ═══════════════════════════════════════════════
 class _QuickActionCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -443,9 +428,6 @@ class _QuickActionCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Settings Group
-// ═══════════════════════════════════════════════
 class _SettingsTileData {
   final IconData icon;
   final Color iconColor;
@@ -552,9 +534,6 @@ class _SettingsRow extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Logout Button
-// ═══════════════════════════════════════════════
 class _LogoutButton extends StatelessWidget {
   final VoidCallback onTap;
 

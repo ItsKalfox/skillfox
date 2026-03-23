@@ -179,7 +179,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
           bottom: false,
           child: Column(
             children: [
-              // ── Blue Header ──────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
                 child: Row(
@@ -218,7 +217,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
                 ),
               ),
 
-              // ── Body card ────────────────────────────────
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -232,7 +230,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Map ──────────────────────────────
                         const _SectionLabel(label: 'PIN LOCATION'),
                         const SizedBox(height: 10),
                         _MapCard(
@@ -262,7 +259,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
                         ),
                         const SizedBox(height: 22),
 
-                        // ── Address fields ────────────────────
                         const _SectionLabel(label: 'ADDRESS DETAILS'),
                         const SizedBox(height: 12),
                         _AddressFormCard(
@@ -327,7 +323,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
                         ),
                         const SizedBox(height: 22),
 
-                        // ── Label ─────────────────────────────
                         const _SectionLabel(label: 'LABEL'),
                         const SizedBox(height: 12),
                         _LabelPresets(
@@ -350,14 +345,12 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
                         ),
                         const SizedBox(height: 16),
 
-                        // ── Default toggle ────────────────────
                         _DefaultToggle(
                           isDefault: _isDefault,
                           onTap: () => setState(() => _isDefault = !_isDefault),
                         ),
                         const SizedBox(height: 28),
 
-                        // ── Save button ───────────────────────
                         GradientButton(
                           text: 'Save Changes',
                           onPressed: _save,
@@ -376,9 +369,6 @@ class _CustomerEditAddressScreenState extends State<CustomerEditAddressScreen>
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Shared map card widget
-// ═══════════════════════════════════════════════
 class _MapCard extends StatelessWidget {
   final LatLng selectedLatLng;
   final bool mapInteractionEnabled;

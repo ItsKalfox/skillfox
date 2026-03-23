@@ -148,7 +148,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
         opacity: _fadeAnimation,
         child: CustomScrollView(
           slivers: [
-            // ── Header ──────────────────────────────────
             SliverAppBar(
               expandedHeight: 180,
               pinned: true,
@@ -226,14 +225,12 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
               ),
             ),
 
-            // ── Body ────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 24, 18, 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Section label
                     const Padding(
                       padding: EdgeInsets.only(left: 4, bottom: 14),
                       child: Text(
@@ -247,7 +244,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
                       ),
                     ),
 
-                    // Current Password
                     _PasswordField(
                       label: 'Current Password',
                       hint: 'Enter your current password',
@@ -262,7 +258,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // New Password
                     _PasswordField(
                       label: 'New Password',
                       hint: 'At least 6 characters',
@@ -277,7 +272,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
                     ),
                     const SizedBox(height: 12),
 
-                    // Confirm Password
                     _PasswordField(
                       label: 'Confirm New Password',
                       hint: 'Re-enter new password',
@@ -292,7 +286,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
 
                     const SizedBox(height: 10),
 
-                    // Password hint
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
                       child: Row(
@@ -333,9 +326,6 @@ class _CustomerSecurityScreenState extends State<CustomerSecurityScreen>
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Password Field
-// ═══════════════════════════════════════════════
 class _PasswordField extends StatefulWidget {
   final String label;
   final String hint;
@@ -471,7 +461,6 @@ class _PasswordFieldState extends State<_PasswordField> {
                     ),
                   ),
                 ),
-                // Eye toggle
                 GestureDetector(
                   onTap: widget.onToggleVisibility,
                   child: Padding(

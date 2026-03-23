@@ -246,7 +246,6 @@ class _UploadPostScreenState extends State<UploadPostScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // MEDIA PREVIEW BOX
             GestureDetector(
               onTap: _showMediaPickerOptions,
               child: Container(

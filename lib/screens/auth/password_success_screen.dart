@@ -46,7 +46,6 @@ class PasswordSuccessScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
 
-                          // ✅ Replaced ✅ emoji with password-change-clipart.png
                           Image.asset(
                             'assets/images/password-change-clipart.png',
                             width: 320,

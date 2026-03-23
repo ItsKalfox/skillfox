@@ -11,7 +11,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            // ── Blue Header ──────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
               child: Row(
@@ -50,7 +49,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
               ),
             ),
 
-            // ── Body ────────────────────────────────────
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -62,7 +60,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Hero banner ────────────────────
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -129,8 +126,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 26),
-
-                      // ── Data we collect ────────────────
                       const _SectionLabel(label: 'DATA WE COLLECT'),
                       const SizedBox(height: 12),
                       const _PrivacyGroup(
@@ -163,7 +158,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 26),
 
-                      // ── How we use your data ───────────
                       const _SectionLabel(label: 'HOW WE USE YOUR DATA'),
                       const SizedBox(height: 12),
                       const _PrivacyGroup(
@@ -196,7 +190,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 26),
 
-                      // ── Data protection ────────────────
                       const _SectionLabel(label: 'DATA PROTECTION'),
                       const SizedBox(height: 12),
                       const _PrivacyGroup(
@@ -229,7 +222,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 26),
 
-                      // ── Your rights ────────────────────
                       const _SectionLabel(label: 'YOUR RIGHTS'),
                       const SizedBox(height: 12),
                       const _PrivacyGroup(
@@ -253,8 +245,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 26),
-
-                      // ── Contact card ───────────────────
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -312,10 +302,6 @@ class CustomerPrivacyDataScreen extends StatelessWidget {
     );
   }
 }
-
-// ═══════════════════════════════════════════════
-//  Data model
-// ═══════════════════════════════════════════════
 class _PrivacyTileData {
   final IconData icon;
   final Color iconColor;
@@ -332,9 +318,6 @@ class _PrivacyTileData {
   });
 }
 
-// ═══════════════════════════════════════════════
-//  Section Label
-// ═══════════════════════════════════════════════
 class _SectionLabel extends StatelessWidget {
   final String label;
   const _SectionLabel({required this.label});
@@ -353,9 +336,6 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Privacy Group
-// ═══════════════════════════════════════════════
 class _PrivacyGroup extends StatelessWidget {
   final List<_PrivacyTileData> tiles;
   const _PrivacyGroup({required this.tiles});
@@ -396,9 +376,6 @@ class _PrivacyGroup extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Expandable Privacy Tile
-// ═══════════════════════════════════════════════
 class _PrivacyTile extends StatefulWidget {
   final _PrivacyTileData data;
   const _PrivacyTile({required this.data});
@@ -509,9 +486,6 @@ class _PrivacyTileState extends State<_PrivacyTile>
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Contact Row
-// ═══════════════════════════════════════════════
 class _ContactRow extends StatelessWidget {
   final IconData icon;
   final Color iconColor;

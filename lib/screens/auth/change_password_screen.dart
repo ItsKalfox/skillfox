@@ -21,7 +21,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _loading = false;
 
-  // ✅ Computed property — no need for _checkEnabled() at all
   bool get _enabled =>
       _passCtrl.text.isNotEmpty &&
       _confirmCtrl.text.isNotEmpty &&
@@ -126,7 +125,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               ),
                               child: Column(
                                 children: [
-                                  // ✅ onChanged calls setState to recompute _enabled
                                   AppTextField(
                                     label: 'Type your new password',
                                     placeholder: '••••••••••••',
@@ -148,7 +146,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                     onChanged: (_) => setState(() {}),
                                   ),
                                   const SizedBox(height: 45),
-                                  // ✅ _enabled is now a getter — always up to date
                                   GradientButton(
                                     text: 'Change password',
                                     onPressed: _enabled ? _changePassword : null,

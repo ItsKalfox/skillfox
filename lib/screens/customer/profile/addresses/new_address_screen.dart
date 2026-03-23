@@ -162,7 +162,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
           bottom: false,
           child: Column(
             children: [
-              // ── Blue Header ──────────────────────────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
                 child: Row(
@@ -201,7 +200,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
                 ),
               ),
 
-              // ── Body card ────────────────────────────────
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -215,7 +213,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Map ──────────────────────────────
                         const _SectionLabel(label: 'PIN LOCATION'),
                         const SizedBox(height: 10),
                         _MapCard(
@@ -245,7 +242,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
                         ),
                         const SizedBox(height: 22),
 
-                        // ── Address fields ────────────────────
                         const _SectionLabel(label: 'ADDRESS DETAILS'),
                         const SizedBox(height: 12),
                         _AddressFormCard(
@@ -310,7 +306,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
                         ),
                         const SizedBox(height: 22),
 
-                        // ── Label ─────────────────────────────
                         const _SectionLabel(label: 'LABEL'),
                         const SizedBox(height: 12),
                         _LabelPresets(
@@ -333,14 +328,12 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
                         ),
                         const SizedBox(height: 16),
 
-                        // ── Default toggle ────────────────────
                         _DefaultToggle(
                           isDefault: _isDefault,
                           onTap: () => setState(() => _isDefault = !_isDefault),
                         ),
                         const SizedBox(height: 28),
 
-                        // ── Save button ───────────────────────
                         GradientButton(
                           text: 'Save Address',
                           onPressed: _save,
@@ -359,9 +352,6 @@ class _CustomerNewAddressScreenState extends State<CustomerNewAddressScreen>
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Shared map card widget
-// ═══════════════════════════════════════════════
 class _MapCard extends StatelessWidget {
   final LatLng selectedLatLng;
   final bool mapInteractionEnabled;
@@ -426,7 +416,6 @@ class _MapCard extends StatelessWidget {
                     : {},
               ),
 
-              // Locked overlay
               if (!mapInteractionEnabled)
                 Positioned.fill(
                   child: GestureDetector(
@@ -475,7 +464,6 @@ class _MapCard extends StatelessWidget {
                   ),
                 ),
 
-              // Top-right controls
               Positioned(
                 right: 12,
                 top: 12,
@@ -583,7 +571,6 @@ class _MapCard extends StatelessWidget {
                 ),
               ),
 
-              // Coordinate pill
               Positioned(
                 left: 12,
                 bottom: 12,
@@ -625,9 +612,6 @@ class _MapCard extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Label presets row
-// ═══════════════════════════════════════════════
 class _LabelPresets extends StatelessWidget {
   final List<String> presets;
   final TextEditingController labelController;
@@ -687,9 +671,6 @@ class _LabelPresets extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Default toggle card
-// ═══════════════════════════════════════════════
 class _DefaultToggle extends StatelessWidget {
   final bool isDefault;
   final VoidCallback onTap;
@@ -782,9 +763,6 @@ class _DefaultToggle extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════
-//  Helpers
-// ═══════════════════════════════════════════════
 class _SectionLabel extends StatelessWidget {
   final String label;
   const _SectionLabel({required this.label});

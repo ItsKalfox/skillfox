@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/sign_in_screen.dart';
@@ -8,6 +10,9 @@ import '../community/upload_post_screen.dart';
 import '../worker/home/worker_home_screen.dart';
 import '../worker/profile/worker_profile_screen.dart';
 import 'worker_community_screen.dart';
+
+import '../customer/dashboard/customer_dashboard_screen.dart';
+import '../category_a/worker_requests_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -25,6 +30,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final GlobalKey<WorkerCommunityScreenState> _communityKey =
       GlobalKey<WorkerCommunityScreenState>();
 
+  Future<void> _handleBookingsTap() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    if (!mounted) return;
+
+    final role = doc.data()?['role'];
+
+    if (role == 'customer') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WorkerRequestsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -34,7 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           const WorkerHomeScreen(),
           WorkerCommunityScreen(key: _communityKey),
-          const _WorkerBookingsTab(),
+          _WorkerBookingsTab(onNavigate: _handleBookingsTap),
           const WorkerProfileScreen(),
         ],
       ),
@@ -64,7 +95,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           : null,
       bottomNavigationBar: _WorkerBottomNavBar(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        onTap: (index) {
+          if (index == 2) {
+            _handleBookingsTap();
+          } else {
+            setState(() => _currentIndex = index);
+          }
+        },
       ),
     );
   }
@@ -169,15 +206,29 @@ class _NavCircleButton extends StatelessWidget {
 // PLACEHOLDER TABS
 // ==========================================
 class _WorkerBookingsTab extends StatelessWidget {
-  const _WorkerBookingsTab();
+  final VoidCallback onNavigate;
+
+  const _WorkerBookingsTab({required this.onNavigate});
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       body: Center(
-        child: Text('Bookings\n(Coming Soon)',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Bookings',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onNavigate,
+              child: const Text('View Requests'),
+            ),
+          ],
+        ),
       ),
     );
   }

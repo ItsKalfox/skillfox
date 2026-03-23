@@ -125,7 +125,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
             ),
           ),
 
-          // REPLY BANNER
           if (_replyingTo != null)
             Container(
               color: const Color(0xFFE8F1FA),
@@ -150,7 +149,6 @@ class _CommentsScreenState extends State<CommentsScreen> {
               ),
             ),
 
-          // BOTTOM INPUT BAR
           Container(
             padding: EdgeInsets.only(
               left: 16,
