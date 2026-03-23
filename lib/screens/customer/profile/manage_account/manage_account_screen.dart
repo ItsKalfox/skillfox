@@ -380,6 +380,32 @@ class ManageAccountScreen extends StatelessWidget {
                                       ],
                                     ),
                                   ),
+                                  const SizedBox(height: 24),
+
+                                  // ── Preferences ──────────────────
+                                  const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                        left: 4,
+                                        bottom: 12,
+                                      ),
+                                      child: Text(
+                                        'PREFERENCES',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Color(0xFF9AA3B4),
+                                          letterSpacing: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  _DistanceLimitSlider(
+                                    userId: user.uid,
+                                    initialValue: (data?['searchRadius'] as num?)?.toDouble() ?? 30.0,
+                                  ),
                                 ],
                               ),
                             ),
@@ -524,3 +550,128 @@ class _InfoTile extends StatelessWidget {
     );
   }
 }
+
+// ═══════════════════════════════════════════════
+//  Distance Limit Slider
+// ═══════════════════════════════════════════════
+class _DistanceLimitSlider extends StatefulWidget {
+  final String userId;
+  final double initialValue;
+
+  const _DistanceLimitSlider({
+    required this.userId,
+    required this.initialValue,
+  });
+
+  @override
+  State<_DistanceLimitSlider> createState() => _DistanceLimitSliderState();
+}
+
+class _DistanceLimitSliderState extends State<_DistanceLimitSlider> {
+  late double _currentValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentValue = widget.initialValue;
+  }
+
+  void _updateFirestore(double value) {
+    FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.userId)
+        .set({'searchRadius': value}, SetOptions(merge: true));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEAECEF)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6FB),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.map_outlined,
+                  size: 17,
+                  color: Color(0xFF9AA3B4),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Search Distance Limit',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1F2E),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Find workers within ${_currentValue.toInt()} km',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF9AA3B4),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SliderTheme(
+            data: SliderThemeData(
+              activeTrackColor: const Color(0xFF4B7DF3),
+              inactiveTrackColor: const Color(0xFFEEF2FF),
+              thumbColor: Colors.white,
+              overlayColor: const Color(0xFF4B7DF3).withOpacity(0.1),
+              trackHeight: 6,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+            ),
+            child: Slider(
+              value: _currentValue,
+              min: 0,
+              max: 100,
+              divisions: 100,
+              label: '${_currentValue.toInt()} km',
+              onChanged: (value) {
+                setState(() {
+                  _currentValue = value;
+                });
+              },
+              onChangeEnd: _updateFirestore,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

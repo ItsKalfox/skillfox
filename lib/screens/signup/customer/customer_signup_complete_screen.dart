@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../dashboard/dashboard_screen.dart';
+import '../../customer/dashboard/customer_dashboard_screen.dart';
 
 class CustomerSignupCompleteScreen extends StatefulWidget {
   const CustomerSignupCompleteScreen({super.key});
@@ -17,7 +17,7 @@ class _CustomerSignupCompleteScreenState extends State<CustomerSignupCompleteScr
     Future.delayed(const Duration(seconds: 5), () {
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(context,
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const CustomerDashboardScreen()),
         (_) => false,
       );
     });

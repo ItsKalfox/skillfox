@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../models/worker.dart';
@@ -105,6 +106,19 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
     _searchController.dispose();
     _mapController?.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomerSearchScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.customerLat != oldWidget.customerLat ||
+        widget.customerLng != oldWidget.customerLng) {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLng(
+          LatLng(widget.customerLat, widget.customerLng),
+        ),
+      );
+    }
   }
 
   // ── Toggle map ────────────────────────────────────────────────────
@@ -238,16 +252,37 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
       appBar: _buildAppBar(),
       body: FadeTransition(
         opacity: _fadeAnimation,
-        child: StreamBuilder<QuerySnapshot>(
+        child: StreamBuilder<Map<String, dynamic>>(
           stream: FirebaseFirestore.instance
               .collection('users')
+              .where('status', isEqualTo: 'active')
               .where('role', isEqualTo: 'worker')
-              .snapshots(),
-          builder: (context, snapshot) {
+              .snapshots()
+              .asyncMap((snapshot) async {
+                double searchRadius = 30.0;
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+                  if (userDoc.exists) {
+                    final data = userDoc.data();
+                    if (data != null && data['searchRadius'] != null) {
+                      searchRadius = (data['searchRadius'] as num).toDouble();
+                    }
+                  }
+                }
+                return {'snapshot': snapshot, 'searchRadius': searchRadius};
+              }),
+          builder: (context, snapshotData) {
             // Compute distances once per snapshot
             List<Map<String, dynamic>> allWorkers = [];
-            if (snapshot.hasData) {
-              allWorkers = snapshot.data!.docs.map((doc) {
+            final isLoading = !snapshotData.hasData;
+
+            if (snapshotData.hasData) {
+              final snapData = snapshotData.data!;
+              final QuerySnapshot snapshot = snapData['snapshot'] as QuerySnapshot;
+              final double searchRadius = snapData['searchRadius'] as double;
+
+              allWorkers = snapshot.docs.map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 final GeoPoint? loc = data['location'];
                 data['distance'] = loc != null
@@ -259,12 +294,11 @@ class _CustomerSearchScreenState extends State<CustomerSearchScreen>
                       )
                     : 999.0;
                 return data;
-              }).toList();
+              }).where((w) => (w['distance'] as double) <= searchRadius).toList();
             }
 
             final filtered = _applyFilters(allWorkers);
             final markers = _buildMarkers(filtered);
-            final isLoading = !snapshot.hasData;
 
             return Column(
               children: [

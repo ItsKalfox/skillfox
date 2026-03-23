@@ -5,6 +5,7 @@ import '../community/customer_community_feed_screen.dart';
 import '../search/customer_search_screen.dart';
 import '../bookings/customer_bookings_screen.dart';
 import '../profile/customer_profile_screen.dart';
+import '../profile/addresses/addresses_screen.dart';
 import '../../../services/location_service.dart';
 import '../../../models/user_address.dart';
 import '../../../services/address_service.dart';
@@ -23,55 +24,64 @@ class _CustomerDashboardScreenState extends State<CustomerDashboardScreen> {
   final LocationService _locationService = LocationService();
   final AddressService _addressService = AddressService();
 
-  double? _customerLat;
-  double? _customerLng;
-  bool _locationLoaded = false;
+  Future<Position?>? _locationFuture;
+  Position? _currentPosition;
+  UserAddress? _selectedAddress;
+  String _selectedAddressLabel = 'Home';
+  bool _isLoadingDefaultAddress = true;
 
   @override
   void initState() {
     super.initState();
-    _resolveLocation();
+    _locationFuture = _locationService.getCurrentLocation();
+    _locationFuture?.then((pos) {
+      if (mounted && pos != null) setState(() => _currentPosition = pos);
+    });
+    _loadDefaultAddress();
   }
 
-  Future<void> _resolveLocation() async {
-    // 1️⃣ Try default saved address first
-    final UserAddress? defaultAddress =
-        await _addressService.getDefaultAddress();
-
-    if (defaultAddress?.location != null) {
-      setState(() {
-        _customerLat = defaultAddress!.location!.latitude;
-        _customerLng = defaultAddress.location!.longitude;
-        _locationLoaded = true;
-      });
-      return;
-    }
-
-    // 2️⃣ Fall back to GPS
-    final Position? position = await _locationService.getCurrentLocation();
-
+  Future<void> _loadDefaultAddress() async {
+    final defaultAddress = await _addressService.getDefaultAddress();
+    if (!mounted) return;
     setState(() {
-      _customerLat = position?.latitude;
-      _customerLng = position?.longitude;
-      _locationLoaded = true;
+      _selectedAddress = defaultAddress;
+      _selectedAddressLabel =
+          (defaultAddress != null && defaultAddress.label.isNotEmpty)
+              ? defaultAddress.label
+              : 'Home';
+      _isLoadingDefaultAddress = false;
     });
+  }
+
+  Future<void> _openAddresses() async {
+    final result = await Navigator.push<UserAddress>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            CustomerAddressesScreen(selectedAddress: _selectedAddress),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _selectedAddress = result;
+        _selectedAddressLabel = result.label.isEmpty ? 'Home' : result.label;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Show loading until location is resolved
-    if (!_locationLoaded) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    // Fallback coords (Colombo) if location is unavailable
-    final double lat = _customerLat ?? 6.9271;
-    final double lng = _customerLng ?? 79.8612;
+    final double lat = _selectedAddress?.location?.latitude ?? _currentPosition?.latitude ?? 6.9271;
+    final double lng = _selectedAddress?.location?.longitude ?? _currentPosition?.longitude ?? 79.8612;
 
     final List<Widget> screens = [
-      const HomeScreen(),
+      HomeScreen(
+        selectedAddress: _selectedAddress,
+        selectedAddressLabel: _selectedAddressLabel,
+        locationFuture: _locationFuture,
+        isLoadingDefaultAddress: _isLoadingDefaultAddress,
+        onAddressTap: _openAddresses,
+      ),
       const CustomerCommunityFeedScreen(),
       CustomerSearchScreen(
         customerLat: lat,

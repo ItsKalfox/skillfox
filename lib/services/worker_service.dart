@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/worker.dart';
 import 'location_service.dart';
 
@@ -36,8 +37,15 @@ class WorkerService {
         .where('status', isEqualTo: 'active')
         .where('role', isEqualTo: 'worker')
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           final workers = <Worker>[];
+
+          final user = FirebaseAuth.instance.currentUser;
+          double searchRadius = 30.0;
+          if (user != null) {
+            final userDoc = await _firestore.collection('users').doc(user.uid).get();
+            searchRadius = _toDouble(userDoc.data()?['searchRadius'], fallback: 30.0);
+          }
 
           for (final doc in snapshot.docs) {
             final data = doc.data();
@@ -45,14 +53,14 @@ class WorkerService {
             final geoPoint = data['location'];
             if (geoPoint is! GeoPoint) continue;
 
-            // Pre-filter: skip workers outside 30 km range
+            // Pre-filter: skip workers outside search radius range
             final distanceKm = _locationService.calculateDistanceKm(
               startLat: customerLat,
               startLng: customerLng,
               endLat: geoPoint.latitude,
               endLng: geoPoint.longitude,
             );
-            if (distanceKm > 30) continue;
+            if (distanceKm > searchRadius) continue;
 
             final bool hasOffer = _toBool(data['hasOffer'], fallback: false);
             final String offerType = (data['offerType'] ?? '').toString();

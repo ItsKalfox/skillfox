@@ -26,6 +26,7 @@ class CommunityFeedScreen extends StatefulWidget {
 class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
   final PostController _postController = PostController();
 
+  Stream<List<PostModel>>? _activeStream;
   late String _activeTab;
   String? _exploreCategory;
   late List<String> _tabs;
@@ -40,6 +41,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
       _activeTab = 'Explore';
       _tabs = ['Explore', 'For You', 'Saved'];
     }
+    _activeStream = _getActiveStream();
   }
 
   Stream<List<PostModel>> _getActiveStream() {
@@ -109,7 +111,10 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                     child: GestureDetector(
                       onTap: () async {
                         if (tab == 'Explore') {
-                          setState(() => _activeTab = 'Explore');
+                          setState(() {
+                            _activeTab = 'Explore';
+                            _activeStream = _getActiveStream();
+                          });
                           final selectedCategory = await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -117,11 +122,16 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
                                     const WorkerCategoryScreen()),
                           );
                           if (selectedCategory != null) {
-                            setState(() =>
-                                _exploreCategory = selectedCategory as String);
+                            setState(() {
+                              _exploreCategory = selectedCategory as String;
+                              _activeStream = _getActiveStream();
+                            });
                           }
                         } else {
-                          setState(() => _activeTab = tab);
+                          setState(() {
+                            _activeTab = tab;
+                            _activeStream = _getActiveStream();
+                          });
                         }
                       },
                       child: AnimatedContainer(
@@ -167,7 +177,7 @@ class _CommunityFeedScreenState extends State<CommunityFeedScreen> {
         ),
       ),
       body: StreamBuilder<List<PostModel>>(
-        stream: _getActiveStream(),
+        stream: _activeStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(

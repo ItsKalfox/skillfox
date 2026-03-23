@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:video_player/video_player.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 import 'package:skillfox/models/post_model.dart';
 import 'package:skillfox/services/community/post_controller.dart';
 import 'package:skillfox/screens/community/comments_screen.dart';
@@ -327,70 +328,103 @@ class FeedVideoPlayer extends StatefulWidget {
 }
 
 class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
-  late VideoPlayerController _videoController;
+  VideoPlayerController? _videoController;
   bool _isPlaying = false;
   bool _isError = false;
 
   @override
   void initState() {
     super.initState();
+    // Do not auto-initialize here. Wait for visibility.
+  }
+
+  void _initializeVideo() {
+    if (_videoController != null) return;
     _videoController =
         VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
           ..initialize().then((_) {
-            if (mounted) setState(() {});
+            if (mounted) {
+              setState(() {
+                _videoController!.setLooping(true);
+              });
+            }
           }).catchError((error) {
             if (mounted) setState(() => _isError = true);
           });
-    _videoController.setLooping(true);
+  }
+
+  void _disposeVideo() {
+    if (_videoController == null) return;
+    final controller = _videoController!;
+    _videoController = null;
+    controller.pause();
+    controller.dispose();
+    if (mounted) {
+      setState(() {
+        _isPlaying = false;
+      });
+    }
   }
 
   @override
   void dispose() {
-    _videoController.dispose();
+    _disposeVideo();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    return VisibilityDetector(
+      key: Key(widget.videoUrl),
+      onVisibilityChanged: (info) {
+        if (!mounted) return;
+        if (info.visibleFraction > 0.0) {
+          _initializeVideo();
+        } else {
+          _disposeVideo();
+        }
+      },
+      child: _buildContent(),
+    );
+  }
+
+  Widget _buildContent() {
     if (_isError) {
       return const SizedBox(
           height: 260,
           child: Center(
               child: Icon(Icons.error_outline, color: Colors.red, size: 50)));
     }
-    return _videoController.value.isInitialized
-        ? GestureDetector(
-            onTap: () {
-              setState(() {
-                _isPlaying
-                    ? _videoController.pause()
-                    : _videoController.play();
-                _isPlaying = !_isPlaying;
-              });
-            },
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                AspectRatio(
-                    aspectRatio: _videoController.value.aspectRatio,
-                    child: VideoPlayer(_videoController)),
-                if (!_isPlaying)
-                  Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: const BoxDecoration(
-                          color: Color(0x99000000), shape: BoxShape.circle),
-                      child: const Icon(Icons.play_arrow,
-                          color: Colors.white, size: 40)),
-              ],
-            ),
-          )
-        : const SizedBox(
-            height: 260,
-            child: Center(
-                child: CircularProgressIndicator(
-                    color: Color(0xFF4A90E2)
-                )
-            )
-          );
+    
+    if (_videoController == null || !_videoController!.value.isInitialized) {
+      return const SizedBox(
+          height: 260,
+          child: Center(
+              child: CircularProgressIndicator(color: Color(0xFF4A90E2))));
+    }
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isPlaying ? _videoController!.pause() : _videoController!.play();
+          _isPlaying = !_isPlaying;
+        });
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          AspectRatio(
+              aspectRatio: _videoController!.value.aspectRatio,
+              child: VideoPlayer(_videoController!)),
+          if (!_isPlaying)
+            Container(
+                padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(
+                    color: Color(0x99000000), shape: BoxShape.circle),
+                child: const Icon(Icons.play_arrow,
+                    color: Colors.white, size: 40)),
+        ],
+      ),
+    );
   }
 }

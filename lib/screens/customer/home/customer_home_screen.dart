@@ -10,12 +10,24 @@ import '../../../services/address_service.dart';
 import '../../../services/favorite_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/worker_service.dart';
-import '../profile/addresses/addresses_screen.dart';
 import 'section_workers_screen.dart';
 import '../../customer/worker/worker_profile.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final UserAddress? selectedAddress;
+  final String selectedAddressLabel;
+  final Future<Position?>? locationFuture;
+  final bool isLoadingDefaultAddress;
+  final VoidCallback onAddressTap;
+
+  const HomeScreen({
+    super.key,
+    required this.selectedAddress,
+    required this.selectedAddressLabel,
+    required this.locationFuture,
+    required this.isLoadingDefaultAddress,
+    required this.onAddressTap,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,12 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool under30Min = false;
   bool highestRatedOnly = false;
 
-  Future<Position?>? _locationFuture;
-
-  UserAddress? _selectedAddress;
-  String _selectedAddressLabel = 'Home';
-  bool _isLoadingDefaultAddress = true;
-
   final List<_CategoryData> categories = const [
     _CategoryData(label: 'All', imagePath: ''),
     _CategoryData(label: 'Mechanic', imagePath: 'assets/icons/mechanic.png'),
@@ -52,42 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _CategoryData(label: 'Mason', imagePath: 'assets/icons/mason.png'),
     _CategoryData(label: 'Handyman', imagePath: 'assets/icons/handyman.png'),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-    _locationFuture = _locationService.getCurrentLocation();
-    _loadDefaultAddress();
-  }
-
-  Future<void> _loadDefaultAddress() async {
-    final defaultAddress = await _addressService.getDefaultAddress();
-    if (!mounted) return;
-    setState(() {
-      _selectedAddress = defaultAddress;
-      _selectedAddressLabel =
-          (defaultAddress != null && defaultAddress.label.isNotEmpty)
-          ? defaultAddress.label
-          : 'Home';
-      _isLoadingDefaultAddress = false;
-    });
-  }
-
-  Future<void> _openAddresses() async {
-    final result = await Navigator.push<UserAddress>(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            CustomerAddressesScreen(selectedAddress: _selectedAddress),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _selectedAddress = result;
-        _selectedAddressLabel = result.label.isEmpty ? 'Home' : result.label;
-      });
-    }
-  }
 
   void _goToWorkerProfile(Worker worker) {
     Navigator.push(
@@ -232,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingDefaultAddress) {
+    if (widget.isLoadingDefaultAddress) {
       return const Scaffold(
         backgroundColor: Color(0xFFF4F6FB),
         body: Center(
@@ -241,8 +211,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (_selectedAddress?.location != null) {
-      final loc = _selectedAddress!.location!;
+    if (widget.selectedAddress?.location != null) {
+      final loc = widget.selectedAddress!.location!;
       return _buildHomeContent(
         customerLat: loc.latitude,
         customerLng: loc.longitude,
@@ -250,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return FutureBuilder<Position?>(
-      future: _locationFuture,
+      future: widget.locationFuture,
       builder: (context, locationSnapshot) {
         if (locationSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -405,8 +375,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           selectedCategory: selectedCategory,
                           onCategoryTap: (c) =>
                               setState(() => selectedCategory = c),
-                          titleText: _selectedAddressLabel,
-                          onAddressTap: _openAddresses,
+                          titleText: widget.selectedAddressLabel,
+                          onAddressTap: widget.onAddressTap,
                         ),
                         const SizedBox(height: 10),
                         Padding(
@@ -1594,12 +1564,15 @@ class _OfferTile extends StatelessWidget {
                         color: Color(0xFF9AA3B4),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        'Travel fee $travelFeeLabel',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF555555),
+                      Flexible(
+                        child: Text(
+                          'Travel fee $travelFeeLabel',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF555555),
+                          ),
                         ),
                       ),
                     ],
@@ -1634,11 +1607,14 @@ class _OfferTile extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      Text(
-                        '${worker.distanceKm.toStringAsFixed(1)} km • ${worker.travelMinutes} min',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF9AA3B4),
+                      Flexible(
+                        child: Text(
+                          '${worker.distanceKm.toStringAsFixed(1)} km • ${worker.travelMinutes} min',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF9AA3B4),
+                          ),
                         ),
                       ),
                     ],
