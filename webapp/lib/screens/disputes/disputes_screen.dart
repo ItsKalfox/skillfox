@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math'; 
+import 'package:video_player/video_player.dart'; 
 import '../../core/theme/app_theme.dart';
 
 class DisputesScreen extends StatefulWidget {
@@ -129,7 +131,6 @@ class _DisputesScreenState extends State<DisputesScreen> {
     if (_selectedStatus != 'All Status') {
       query = query.where('status', isEqualTo: _selectedStatus);
     }
-    // Sort by newest reports first
     return query.orderBy('timestamp', descending: true).snapshots();
   }
 }
@@ -168,7 +169,6 @@ class _DisputeCard extends StatelessWidget {
 
   const _DisputeCard({required this.docId, required this.data});
 
-  // Correctly formats the Firebase Timestamp stored by the mobile app
   String _formatDate(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     try {
@@ -196,7 +196,6 @@ class _DisputeCard extends StatelessWidget {
     }
   }
 
-  // The professional Investigation Dialog
   void _investigatePost(BuildContext context, String postId) {
     if (postId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,7 +220,7 @@ class _DisputeCard extends StatelessWidget {
               if (!snapshot.hasData || !snapshot.data!.exists) {
                 return const SizedBox(
                   height: 100,
-                  child: Center(child: Text('This post has already been deleted or removed from the database.', style: TextStyle(color: AppTheme.danger))),
+                  child: Center(child: Text('This post has already been deleted or removed.', style: TextStyle(color: AppTheme.danger))),
                 );
               }
 
@@ -247,25 +246,50 @@ class _DisputeCard extends StatelessWidget {
                     const Text('Description / Content:', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
                     Text(postData['description'] ?? 'No text provided.', style: const TextStyle(fontSize: 15, height: 1.5)),
-                    const SizedBox(height: 24),
                     
-                    if (postData['mediaUrl'] != null && postData['mediaUrl'].toString().isNotEmpty)
+                    if (postData['mediaUrl'] != null && postData['mediaUrl'].toString().trim().isNotEmpty)
                       Container(
-                        height: 300,
+                        margin: const EdgeInsets.only(top: 24),
+                        height: 350, 
                         width: double.infinity,
-                        decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(
+                          color: Colors.black, // Dark background looks best for media
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
+                          // FIX: Replaced the static placeholder with the real Video Player
                           child: isVideo 
-                              ? const Center(child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.play_circle_fill, size: 64, color: Colors.black45),
-                                    SizedBox(height: 8),
-                                    Text('Video Attachment', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold))
-                                  ],
-                                ))
-                              : Image.network(postData['mediaUrl'], fit: BoxFit.cover, errorBuilder: (c, e, s) => const Center(child: Icon(Icons.broken_image, color: Colors.grey))),
+                              ? AdminVideoPlayer(videoUrl: postData['mediaUrl'])
+                              : Image.network(
+                                  postData['mediaUrl'], 
+                                  fit: BoxFit.contain, 
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppTheme.primary,
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.broken_image, color: Colors.red, size: 50),
+                                          const SizedBox(height: 8),
+                                          const Text('Network / CORS Error', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                          const SizedBox(height: 4),
+                                          Text('URL: ${postData['mediaUrl'].toString().substring(0, min(30, postData['mediaUrl'].toString().length))}...', style: const TextStyle(fontSize: 10, color: Colors.grey), textAlign: TextAlign.center,)
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ),
                   ],
@@ -282,7 +306,6 @@ class _DisputeCard extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success, foregroundColor: Colors.white, elevation: 0),
             onPressed: () async {
-              // Action 1: Dismiss report (leave the post alone)
               await FirebaseFirestore.instance.collection('reports').doc(docId).update({'status': 'resolved'});
               if (context.mounted) Navigator.pop(context);
             },
@@ -291,7 +314,6 @@ class _DisputeCard extends StatelessWidget {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger, foregroundColor: Colors.white, elevation: 0),
             onPressed: () async {
-              // Action 2: Delete the post entirely AND resolve the report
               await FirebaseFirestore.instance.collection('posts').doc(postId).delete();
               await FirebaseFirestore.instance.collection('reports').doc(docId).update({'status': 'resolved'});
               if (context.mounted) Navigator.pop(context);
@@ -307,8 +329,6 @@ class _DisputeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = data['status']?.toString() ?? 'open';
     final isResolved = status == 'resolved';
-    
-    // Grabs the post ID to pass into the investigation dialog
     final String postId = data['postId'] ?? ''; 
 
     Color statusColor = status == 'resolved' ? AppTheme.success : (status == 'in_progress' ? AppTheme.warning : AppTheme.danger);
@@ -360,11 +380,9 @@ class _DisputeCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Action Buttons
           if (!isResolved)
             Row(
               children: [
-                // The new Investigate Button
                 ElevatedButton.icon(
                   onPressed: postId.isNotEmpty ? () => _investigatePost(context, postId) : null,
                   icon: const Icon(Icons.manage_search, size: 18),
@@ -406,6 +424,102 @@ class _DisputeCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ==============================================================
+// NEW FEATURE: Custom Admin Video Player for the Web Dashboard
+// ==============================================================
+class AdminVideoPlayer extends StatefulWidget {
+  final String videoUrl;
+  const AdminVideoPlayer({super.key, required this.videoUrl});
+
+  @override
+  State<AdminVideoPlayer> createState() => _AdminVideoPlayerState();
+}
+
+class _AdminVideoPlayerState extends State<AdminVideoPlayer> {
+  late VideoPlayerController _controller;
+  bool _isInitialized = false;
+  bool _isError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+          });
+        }
+      }).catchError((error) {
+        if (mounted) {
+          setState(() {
+            _isError = true;
+          });
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isError) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 48),
+            SizedBox(height: 8),
+            Text('Failed to load video (Network/CORS)', style: TextStyle(color: Colors.red)),
+          ],
+        ),
+      );
+    }
+
+    if (!_isInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: VideoPlayer(_controller),
+        ),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _controller.value.isPlaying ? _controller.pause() : _controller.play();
+            });
+          },
+          child: Container(
+            color: Colors.transparent, // Captures taps across the whole video
+            child: Center(
+              child: AnimatedOpacity(
+                opacity: _controller.value.isPlaying ? 0.0 : 1.0,
+                duration: const Duration(milliseconds: 200),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 48),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
