@@ -341,29 +341,27 @@ class _FeedVideoPlayerState extends State<FeedVideoPlayer> {
   void _initializeVideo() {
     if (_videoController != null) return;
     _videoController =
-        VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-          ..initialize().then((_) {
-            if (mounted) {
-              setState(() {
-                _videoController!.setLooping(true);
-              });
-            }
-          }).catchError((error) {
-            if (mounted) setState(() => _isError = true);
-          });
+        VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    
+    _videoController!.initialize().then((_) {
+      if (mounted) {
+        setState(() {
+          _videoController!.setLooping(true);
+        });
+      }
+    }).catchError((error) {
+      if (mounted) setState(() => _isError = true);
+    });
   }
 
   void _disposeVideo() {
     if (_videoController == null) return;
     final controller = _videoController!;
     _videoController = null;
+    _isPlaying = false; // Reset state without calling setState()
+    
     controller.pause();
     controller.dispose();
-    if (mounted) {
-      setState(() {
-        _isPlaying = false;
-      });
-    }
   }
 
   @override

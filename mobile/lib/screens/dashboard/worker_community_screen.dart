@@ -43,7 +43,7 @@ class WorkerCommunityScreenState extends State<WorkerCommunityScreen> {
 
     final data = doc.data() ?? {};
     final name = (data['name'] ?? '').toString().trim();
-    final category = (data['category'] ?? '').toString().trim();
+    final category = (data['jobType'] ?? '').toString().trim();
 
     setState(() {
       _uid = user.uid;
