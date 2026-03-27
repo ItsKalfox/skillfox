@@ -1,0 +1,24 @@
+<svg width="236" height="237" viewBox="0 0 236 237" fill="none" xmlns="http://www.w3.org/2000/svg">
+<foreignObject x="-31.5333" y="-31.5333" width="299.067" height="300.067"><div xmlns="http://www.w3.org/1999/xhtml" style="backdrop-filter:blur(15.77px);clip-path:url(#bgblur_0_1_2414_clip_path);height:100%;width:100%"></div></foreignObject><g filter="url(#filter0_ii_1_2414)" data-figma-bg-blur-radius="31.5333">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M103.541 0.255168C159.1 -2.96587 217.579 24.3857 233.132 77.8947C247.702 128.02 204.136 169.897 161.637 200.134C121.033 229.022 68.6156 253.051 28.5069 223.478C-11.1201 194.26 -2.55249 137.352 13.1463 90.6483C28.1649 45.9683 56.5412 2.97995 103.541 0.255168Z" fill="#6EB6F7" fill-opacity="0.1"/>
+</g>
+<defs>
+<filter id="filter0_ii_1_2414" x="-31.5333" y="-31.5333" width="299.067" height="300.067" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="-15.7667" dy="15.7667"/>
+<feGaussianBlur stdDeviation="7.88333"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.1 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_1_2414"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dx="15.7667" dy="-15.7667"/>
+<feGaussianBlur stdDeviation="7.88333"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0.327539 0 0 0 0 0.541943 0 0 0 0 0.734667 0 0 0 0.1 0"/>
+<feBlend mode="normal" in2="effect1_innerShadow_1_2414" result="effect2_innerShadow_1_2414"/>
+</filter>
+<clipPath id="bgblur_0_1_2414_clip_path" transform="translate(31.5333 31.5333)"><path fill-rule="evenodd" clip-rule="evenodd" d="M103.541 0.255168C159.1 -2.96587 217.579 24.3857 233.132 77.8947C247.702 128.02 204.136 169.897 161.637 200.134C121.033 229.022 68.6156 253.051 28.5069 223.478C-11.1201 194.26 -2.55249 137.352 13.1463 90.6483C28.1649 45.9683 56.5412 2.97995 103.541 0.255168Z"/>
+</clipPath></defs>
+</svg>

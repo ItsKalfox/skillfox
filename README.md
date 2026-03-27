@@ -22,18 +22,21 @@ The application is developed as a **Flutter mobile app with Firebase as the back
 
 ```bash
 skillfox/
-├── android/
-├── ios/
-├── web/
-├── lib/
-│ ├── main.dart
-│ ├── firebase_options.dart
-│ ├── pages/
-│ ├── models/
-│ ├── services/
-│ └── widgets/
-├── test/
-├── pubspec.yaml
+├── webapp/
+├── mobile/
+│   ├── android/
+│   ├── ios/
+│   ├── web/
+│   ├── lib/
+│   │ ├── main.dart
+│   │ ├── firebase_options.dart
+│   │ ├── pages/
+│   │ ├── models/
+│   │ ├── services/
+│   │ └── widgets/
+│   ├── test/
+│   └── pubspec.yaml
+├── .gitignore
 └── README.md
 ```
 
@@ -120,4 +123,27 @@ flutterfire_cli: ^1.3.1
 ### Firebase CLI
 ```
 firebase-tools: ^15.9.0
+```
+
+### Other
+```
+provider: ^6.1.2
+google_maps_flutter: ^2.6.1
+image_picker: ^1.1.2
+shared_preferences: ^2.3.2
+google_fonts: ^6.2.1
+file_picker: ^8.1.2
+mailer: ^6.1.0
+permission_handler: ^11.3.1
+flutter_svg: ^2.0.10
+geolocator: ^14.0.1
+image_cropper: ^11.0.0
+cached_network_image: ^3.3.1
+video_player: ^2.9.1
+video_compress: ^3.1.2
+flutter_image_compress: ^2.3.0
+path_provider: ^2.1.3
+fl_chart: ^1.2.0
+visibility_detector: ^0.4.0+2
+geocoding: ^4.0.0
 ```
