@@ -110,7 +110,10 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         break;
       case 'accepted':
         _rejected = false;
-        _stage = 2;
+        // Cat B and C have no inspection fee — skip payment step (stage 2)
+        // and go straight to "Worker on the way" (stage 3).
+        _stage = _hasInspectionFee ? 2 : 3;
+        if (!_hasInspectionFee) _startWorkerTracking();
         break;
       case 'rejected':
         _rejected = true;
@@ -145,6 +148,11 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       case 'quotation_declined':
         _rejected = false;
         _stage = 8;
+        break;
+      case 'job_done':
+        _rejected = false;
+        _stage = 9;
+        _displayTimer?.cancel();
         break;
       case 'cancelled':
         if (mounted) Navigator.pop(context);
@@ -254,6 +262,29 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       (_data['totalAmount'] as num?)?.toDouble() ??
       (_inspectionFee + _distanceFee + _serviceFee);
   String get _requestId => widget.requestId;
+
+  /// Category type — B and C do NOT have an inspection fee payment step.
+  String get _categoryType {
+    final stored = (_data['categoryType'] as String?)?.trim().toUpperCase();
+    if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
+    const catA = {'plumber', 'electrician', 'mechanic', 'mason'};
+    const catC = {
+      'teacher',
+      'tutor',
+      'caregiver',
+      'care giver',
+      'baby sitter',
+      'babysitter',
+      'nurse',
+      'nanny',
+    };
+    final lower = (_data['category'] as String? ?? '').toLowerCase().trim();
+    if (catA.contains(lower)) return 'A';
+    if (catC.contains(lower)) return 'C';
+    return 'B';
+  }
+
+  bool get _hasInspectionFee => _categoryType == 'A';
 
   String _fmt(num n) {
     final s = n.toStringAsFixed(0);
@@ -437,8 +468,12 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
                 if (_stage == 4) _buildArrivedBanner(),
                 _buildSummaryCard(),
                 if (_stage >= 2 && !_rejected) _buildWorkerCard(),
-                if (_stage >= 2 && !_rejected) _buildBillCard(),
-                if (_stage >= 3) _buildPaymentConfirmedBadge(),
+                // Only show inspection fee bill for Cat A
+                if (_stage >= 2 && !_rejected && _hasInspectionFee)
+                  _buildBillCard(),
+                // Payment confirmed badge only for Cat A (inspection fee)
+                if (_stage >= 3 && _hasInspectionFee)
+                  _buildPaymentConfirmedBadge(),
                 if (_stage == 4) _buildCustomerTimerCard(),
                 if (_stage == 3 || _stage == 4) _buildMapSection(),
                 if (_stage == 5) _buildCompletedSummary(),
@@ -1250,52 +1285,63 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         ),
       );
 
-  Widget _buildPaymentConfirmedBadge() => Container(
-    margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFECFDF5),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
-    ),
-    child: Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: _C.green.withOpacity(0.12),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_circle_rounded,
-            size: 16,
-            color: _C.green,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Confirmed',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _C.green,
-              ),
+  Widget _buildPaymentConfirmedBadge() {
+    final isJobDone = _data['status'] == 'job_done';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: _C.green.withOpacity(0.12),
+              shape: BoxShape.circle,
             ),
-            Text(
-              'LKR ${_fmt(_totalAmount)} paid successfully',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF166534)),
+            child: Icon(
+              isJobDone
+                  ? Icons.celebration_rounded
+                  : Icons.check_circle_rounded,
+              size: 16,
+              color: _C.green,
             ),
-          ],
-        ),
-        const Spacer(),
-        const Icon(Icons.verified_rounded, size: 18, color: _C.green),
-      ],
-    ),
-  );
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isJobDone ? 'Quotation Completed' : 'Payment Confirmed',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _C.green,
+                  ),
+                ),
+                Text(
+                  isJobDone
+                      ? 'The worker has successfully completed the job.'
+                      : 'LKR ${_fmt(_totalAmount)} paid successfully',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF166534),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.verified_rounded, size: 18, color: _C.green),
+        ],
+      ),
+    );
+  }
 
   Widget _buildCustomerTimerCard() => Container(
     margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1871,6 +1917,7 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           ),
         );
       case 8:
+      case 9:
         return _gradBtn(
           label: 'Leave a Review',
           colors: [_C.gradA, _C.gradB],
