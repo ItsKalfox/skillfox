@@ -166,24 +166,9 @@ class WorkerProfileScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _QuickActionCard(
-                          icon: Icons.receipt_long_rounded,
-                          iconColor: const Color(0xFF4B7DF3),
-                          iconBg: const Color(0xFFEEF2FF),
-                          label: 'History',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const WorkerBookingHistoryScreen(),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
                   // ── Settings Section ───────────────────
                   const Padding(

@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import '../../../models/worker.dart';
 import '../../category_a/waiting_worker_screen.dart';
 import '../../category_a/customer_quotation_view_screen.dart';
+import '../../category_a/review_screen.dart';
+import '../../category_b/customer_quotation_screen.dart';
+import '../../category_c/customer_subscription_screen.dart';
 
 class _C {
   static const gradA = Color(0xFF469FEF);
@@ -137,6 +140,7 @@ const _historyStatuses = [
   'completed',
   'job_done',
 ];
+
 class CustomerBookingsScreen extends StatefulWidget {
   const CustomerBookingsScreen({super.key});
 
@@ -299,14 +303,86 @@ class _BookingListState extends State<_BookingList> {
     }
   }
 
+  /// Derive category type — mirrors worker_profile_screen logic.
+  String _categoryType(Map<String, dynamic> d) {
+    final stored = (d['categoryType'] as String?)?.trim().toUpperCase();
+    if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
+    const catC = {
+      'teacher',
+      'tutor',
+      'caregiver',
+      'care giver',
+      'baby sitter',
+      'babysitter',
+      'nurse',
+      'nanny',
+    };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
+    final lower = (d['category'] as String? ?? '').toLowerCase().trim();
+    if (catC.contains(lower)) return 'C';
+    if (catB.contains(lower)) return 'B';
+    return 'A';
+  }
+
   void _navigate(BuildContext context, Map<String, dynamic> d) {
     final status = d['status'] as String? ?? 'pending';
+    final catType = _categoryType(d);
 
+    // quotation_sent — route to correct screen by category
     if (status == 'quotation_sent') {
+      switch (catType) {
+        case 'B':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CategoryBCustomerQuotationScreen(
+                requestId: d['id'] as String,
+                requestData: d,
+              ),
+            ),
+          );
+          return;
+        case 'C':
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CategoryCCustomerSubscriptionScreen(
+                requestId: d['id'] as String,
+                requestData: d,
+              ),
+            ),
+          );
+          return;
+        default:
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CustomerQuotationViewScreen(
+                requestId: d['id'] as String,
+                requestData: d,
+              ),
+            ),
+          );
+          return;
+      }
+    }
+
+    // Cat C active subscription
+    if (catType == 'C' &&
+        (status == 'inprogress' ||
+            (d['cSubscriptionStatus'] as String?) == 'active')) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => CustomerQuotationViewScreen(
+          builder: (_) => CategoryCCustomerSubscriptionScreen(
             requestId: d['id'] as String,
             requestData: d,
           ),
@@ -315,6 +391,37 @@ class _BookingListState extends State<_BookingList> {
       return;
     }
 
+    // Cat B inprogress (paid)
+    if (catType == 'B' && status == 'inprogress') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CategoryBCustomerQuotationScreen(
+            requestId: d['id'] as String,
+            requestData: d,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Cat B/C completed — go to ReviewScreen
+    if ((catType == 'B' || catType == 'C') &&
+        (status == 'job_done' || status == 'completed')) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReviewScreen(
+            requestId: d['id'] as String,
+            requestData: d,
+            isWorker: false,
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Fallback: WaitingWorkerScreen (Cat A + Cat B pending)
     Navigator.push(
       context,
       MaterialPageRoute(

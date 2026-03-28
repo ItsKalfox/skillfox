@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../../models/worker.dart';
 import 'package:skillfox/screens/category_a/inspection_form_screen.dart';
+import 'package:skillfox/screens/category_b/request_form_screen.dart';
+import 'package:skillfox/screens/category_c/request_form_screen.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
   final Worker worker;
@@ -39,27 +41,25 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   static const _avatarDiameter = 90.0;
   static const _avatarOverlap = _avatarDiameter / 2;
 
-  // ── Field readers (Firestore → Worker model fallback) ─────────────
+  // ── Field readers ─────────────────────────────────────────────────
   String get _name => _str('name') ?? w.name;
   String get _jobType => _str('jobType') ?? w.category;
   String get _about => _str('about') ?? '';
   String get _experience => _str('experience') ?? '';
-
-  // Firestore has both profileImageUrl and profilePhotoUrl — prefer profileImageUrl
   String get _photo =>
       _str('profileImageUrl') ?? _str('profilePhotoUrl') ?? w.profilePhotoUrl;
-
-  // coverPhotoUrl is the wide banner photo
   String get _coverPhoto => _str('coverPhotoUrl') ?? _photo;
 
-  bool get _isAvailable =>
-      (_doc['isAvailable'] as bool?) ?? true; // default true for active workers
+  bool get _isAvailable => (_doc['isAvailable'] as bool?) ?? true;
   double get _rating =>
-      (_doc['ratingAverage'] as num?)?.toDouble() ??
-      (_doc['rating'] as num?)?.toDouble() ??
+      (_doc['ratingAverage'] as num?)?.toDouble() ?? // users collection field
+      (_doc['averageRating'] as num?)?.toDouble() ?? // workers collection field
+      (_doc['rating'] as num?)?.toDouble() ?? // fallback
       w.rating;
   int get _ratingCount =>
-      (_doc['ratingCount'] as num?)?.toInt() ?? w.ratingCount;
+      (_doc['ratingCount'] as num?)?.toInt() ?? // users collection field
+      (_doc['totalReviews'] as num?)?.toInt() ?? // workers collection field
+      w.ratingCount;
 
   bool get _hasOffer => (_doc['hasOffer'] as bool?) ?? w.hasOffer;
   String get _offerType => _str('offerType') ?? w.offerType;
@@ -68,7 +68,43 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       (_doc['travelFee'] as num?)?.toDouble() ?? w.travelFee;
   bool get _isFreeTravel => _offerType == 'Free Travel';
 
-  // Simple null-if-blank reader — no dummy-text filtering
+  // Firestore categoryType field (A / B / C).
+  // Falls back to deriving from category name so existing workers
+  // without the field still route correctly.
+  String get _categoryType {
+    final stored = (_doc['categoryType'] as String?)?.trim().toUpperCase();
+    if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
+    return _deriveCategoryType(w.category);
+  }
+
+  /// Derive the category type from the job name when the Firestore field
+  /// is absent.  Extend these lists as your catalogue grows.
+  static String _deriveCategoryType(String category) {
+    const catC = {
+      'teacher',
+      'tutor',
+      'caregiver',
+      'care giver',
+      'baby sitter',
+      'babysitter',
+      'nurse',
+      'nanny',
+    };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
+    final lower = category.toLowerCase().trim();
+    if (catC.contains(lower)) return 'C';
+    if (catB.contains(lower)) return 'B';
+    return 'A'; // default — inspection-based (plumber, electrician, mechanic, mason, etc.)
+  }
+
   String? _str(String key) {
     final v = _doc[key]?.toString().trim();
     return (v == null || v.isEmpty) ? null : v;
@@ -123,7 +159,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     Map<String, dynamic>? found;
     String? foundId;
 
-    // 1: direct doc ID
     try {
       final snap = await col
           .doc(w.id)
@@ -134,7 +169,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       }
     } catch (_) {}
 
-    // 2: uid field
     if (found == null) {
       try {
         final q = await col
@@ -148,7 +182,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       } catch (_) {}
     }
 
-    // 3: name field
     if (found == null && w.name.isNotEmpty) {
       try {
         final q = await col
@@ -168,24 +201,28 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       _loading = false;
     });
 
-    if (foundId != null) {
-      _loadReviews(foundId);
-    } else {
-      if (mounted) setState(() => _reviewsLoading = false);
-    }
+    // _loadReviews queries the top-level 'reviews' collection by w.id
+    // (the worker's Firebase Auth UID). foundId is not used for reviews.
+    _loadReviews(foundId ?? '');
   }
 
   Future<void> _loadReviews(String docId) async {
+    // The 'reviews' collection stores workerId = the worker's Firebase Auth UID.
+    // review_screen.dart writes: 'workerId': requestData['workerId']
+    // which is always the worker's UID — so w.id is the correct key to query by.
+    // We must NOT fall back to docId (the users collection doc ID) because
+    // that could accidentally match a different worker's reviews.
     try {
       final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(docId)
           .collection('reviews')
+          .where('workerId', isEqualTo: w.id)
           .orderBy('createdAt', descending: true)
           .get(const GetOptions(source: Source.server));
       if (!mounted) return;
       setState(() {
-        _reviews = snap.docs.map((d) => d.data()).toList();
+        _reviews = snap.docs
+            .map((d) => d.data() as Map<String, dynamic>)
+            .toList();
         _reviewsLoading = false;
       });
     } catch (_) {
@@ -321,7 +358,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         _buildProfileHeader(),
         _hline(),
 
-        // ABOUT — shown only when Firestore has content
         if (_about.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(33, 14, 33, 14),
@@ -345,10 +381,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
           _hline(),
         ],
 
-        // OFFER
         if (_hasOffer) ...[_buildOfferSection(), _hline()],
 
-        // CERTIFICATIONS
         Padding(
           padding: const EdgeInsets.fromLTRB(33, 14, 33, 14),
           child: Column(
@@ -386,7 +420,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         ),
         _hline(),
 
-        // EXPERIENCE
         Padding(
           padding: const EdgeInsets.fromLTRB(33, 14, 33, 14),
           child: Column(
@@ -409,7 +442,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         ),
         _hline(),
 
-        // SERVICES & PRICING
         const SizedBox(height: 16),
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -486,7 +518,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         ),
         const SizedBox(height: 4),
 
-        // REVIEWS
         Padding(
           padding: const EdgeInsets.fromLTRB(29, 22, 29, 0),
           child: Column(
@@ -689,6 +720,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                   color: _muted,
                 ),
               ),
+              // ── Category badge ──────────────────────────────────────
+              const SizedBox(height: 8),
+              _categoryBadge(_categoryType),
             ],
           ),
         ),
@@ -750,54 +784,175 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     );
   }
 
+  // Small badge showing which category this worker belongs to
+  Widget _categoryBadge(String type) {
+    final Map<String, _BadgeStyle> styles = {
+      'A': _BadgeStyle(
+        label: 'Inspection Job',
+        icon: Icons.search_rounded,
+        bg: const Color(0xFFEFF6FF),
+        fg: const Color(0xFF2563EB),
+      ),
+      'B': _BadgeStyle(
+        label: 'One-time Job',
+        icon: Icons.handyman_rounded,
+        bg: const Color(0xFFECFDF5),
+        fg: const Color(0xFF059669),
+      ),
+      'C': _BadgeStyle(
+        label: 'Subscription',
+        icon: Icons.repeat_rounded,
+        bg: const Color(0xFFF3EEFF),
+        fg: const Color(0xFF7C3AED),
+      ),
+    };
+    final s = styles[type] ?? styles['B']!;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: s.bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(s.icon, size: 12, color: s.fg),
+          const SizedBox(width: 5),
+          Text(
+            s.label,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: s.fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Review tile ───────────────────────────────────────────────────
+  // Fields from the top-level 'reviews' collection:
+  //   customerName, rating, reviewText, createdAt, category
   Widget _buildReviewTile(Map<String, dynamic> r) {
-    final name = (r['reviewerName'] as String? ?? 'Customer').trim();
+    // Support both old subcollection field names and new top-level names
+    final name =
+        ((r['customerName'] as String?) ??
+                (r['reviewerName'] as String?) ??
+                'Customer')
+            .trim();
     final rating = (r['rating'] as num? ?? 0).toDouble();
-    final comment = (r['comment'] as String? ?? '').trim();
+    final comment =
+        ((r['reviewText'] as String?) ?? (r['comment'] as String?) ?? '')
+            .trim();
+    final category = (r['category'] as String? ?? '').trim();
     final time = _timeAgo(r['createdAt']);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(height: 1, color: _lineA),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: _stars(rating, 10)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                name,
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 10,
-                  color: _muted,
+            // Customer avatar initial
+            Container(
+              width: 30,
+              height: 30,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [Color(0xFF469FEF), Color(0xFF6C56F0)],
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    fontFamily: 'Poppins',
+                  ),
                 ),
               ),
             ),
-            Text(
-              time,
-              style: const TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 10,
-                color: _muted,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        time,
+                        style: const TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 9,
+                          color: _muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Row(children: _stars(rating, 11)),
+                      if (category.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEEF2FF),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            category,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 8,
+                              color: Color(0xFF6C56F0),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (comment.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      comment,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        height: 1.6,
+                        color: _ink,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
         ),
-        if (comment.isNotEmpty) ...[
-          const SizedBox(height: 5),
-          Text(
-            comment,
-            style: const TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 11,
-              height: 1.82,
-              color: _ink,
-            ),
-          ),
-        ],
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -819,77 +974,116 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     ),
   );
 
-  bool _isCategoryAWorker(Worker worker) {
-    const categoryA = {'plumber', 'electrician', 'mechanic'};
-    return categoryA.contains(worker.category.toLowerCase());
-  }
-
+  // ── Request routing ───────────────────────────────────────────────
   void _openRequestFlow(BuildContext ctx) {
-    if (_isCategoryAWorker(w)) {
-      Navigator.push(
-        ctx,
-        MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: w)),
-      );
-    } else {
+    // Worker must be available
+    if (!_isAvailable) {
       ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('Request Service temporarily unavailable for this category.')),
+        const SnackBar(
+          content: Text('This worker is currently unavailable.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
+      return;
+    }
+
+    switch (_categoryType) {
+      case 'A':
+        Navigator.push(
+          ctx,
+          MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: w)),
+        );
+        break;
+
+      case 'B':
+        Navigator.push(
+          ctx,
+          MaterialPageRoute(
+            builder: (_) => CategoryBRequestFormScreen(worker: w),
+          ),
+        );
+        break;
+
+      case 'C':
+        Navigator.push(
+          ctx,
+          MaterialPageRoute(
+            builder: (_) => CategoryCRequestFormScreen(worker: w),
+          ),
+        );
+        break;
+
+      default:
+        // Fallback — default to Cat A inspection flow
+        Navigator.push(
+          ctx,
+          MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: w)),
+        );
     }
   }
 
   // ── Sticky request button ─────────────────────────────────────────
-  Widget _buildRequestButton(BuildContext ctx) => Positioned(
-    left: 0,
-    right: 0,
-    bottom: 0,
-    child: Container(
-      decoration: BoxDecoration(
-        color: _white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.07),
-            blurRadius: 14,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.fromLTRB(66, 12, 66, 28),
-      child: DecoratedBox(
+  Widget _buildRequestButton(BuildContext ctx) {
+    // Tint the button to match the worker's category
+    final List<Color> btnColors = switch (_categoryType) {
+      'A' => const [Color(0xFF469FEF), Color(0xFF6C56F0)],
+      'B' => const [Color(0xFF10B981), Color(0xFF059669)],
+      'C' => const [Color(0xFF8B5CF6), Color(0xFF6C56F0)],
+      _ => const [Color(0xFF469FEF), Color(0xFF6C56F0)],
+    };
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          gradient: const LinearGradient(
-            colors: _grad,
-            stops: _gradStop,
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-        ),
-        child: SizedBox(
-          height: 50,
-          child: ElevatedButton(
-            onPressed: () => _openRequestFlow(ctx),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
+          color: _white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 14,
+              offset: const Offset(0, -4),
             ),
-            child: const Text(
-              'Request',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: _white,
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(66, 12, 66, 28),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            gradient: LinearGradient(
+              colors: btnColors,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+          child: SizedBox(
+            height: 50,
+            child: ElevatedButton(
+              onPressed: () => _openRequestFlow(ctx),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              child: const Text(
+                'Request',
+                style: TextStyle(
+                  fontFamily: 'Poppins',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: _white,
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   // ── Cert viewer ───────────────────────────────────────────────────
   void _openCert(BuildContext ctx, int initial) {
@@ -994,7 +1188,20 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 }
 
-// ── Offer Detail Row ──────────────────────────────────────────────────
+// ── Badge style helper ────────────────────────────────────────────────────────
+class _BadgeStyle {
+  final String label;
+  final IconData icon;
+  final Color bg, fg;
+  const _BadgeStyle({
+    required this.label,
+    required this.icon,
+    required this.bg,
+    required this.fg,
+  });
+}
+
+// ── Offer Detail Row ──────────────────────────────────────────────────────────
 class _OfferDetailRow extends StatelessWidget {
   final IconData icon;
   final String label;

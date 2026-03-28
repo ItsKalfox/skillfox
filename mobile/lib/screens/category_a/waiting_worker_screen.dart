@@ -110,7 +110,9 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         break;
       case 'accepted':
         _rejected = false;
-        _stage = 2;
+        // Cat B/C skip inspection fee payment — go straight to stage 3
+        _stage = _hasInspectionFee ? 2 : 3;
+        if (!_hasInspectionFee) _startWorkerTracking();
         break;
       case 'rejected':
         _rejected = true;
@@ -259,6 +261,50 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       (_data['totalAmount'] as num?)?.toDouble() ??
       (_inspectionFee + _distanceFee + _serviceFee);
   String get _requestId => widget.requestId;
+
+  String get _categoryType {
+    final stored = (_data['categoryType'] as String?)?.trim().toUpperCase();
+    if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
+    const catC = {
+      'teacher',
+      'tutor',
+      'caregiver',
+      'care giver',
+      'baby sitter',
+      'babysitter',
+      'nurse',
+      'nanny',
+    };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
+    final lower = (_data['category'] as String? ?? '').toLowerCase().trim();
+    if (catC.contains(lower)) return 'C';
+    if (catB.contains(lower)) return 'B';
+    // Default to Cat A — inspection-based workers
+    return 'A';
+  }
+
+  bool get _hasInspectionFee => _categoryType == 'A';
+
+  String get _categoryTypeLabel {
+    switch (_categoryType) {
+      case 'A':
+        return 'Inspection Job';
+      case 'B':
+        return 'One-time Job';
+      case 'C':
+        return 'Subscription';
+      default:
+        return '';
+    }
+  }
 
   String _fmt(num n) {
     final s = n.toStringAsFixed(0);
@@ -442,8 +488,10 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
                 if (_stage == 4) _buildArrivedBanner(),
                 _buildSummaryCard(),
                 if (_stage >= 2 && !_rejected) _buildWorkerCard(),
-                if (_stage >= 2 && !_rejected) _buildBillCard(),
-                if (_stage >= 3) _buildPaymentConfirmedBadge(),
+                if (_stage >= 2 && !_rejected && _hasInspectionFee)
+                  _buildBillCard(),
+                if (_stage >= 3 && _hasInspectionFee)
+                  _buildPaymentConfirmedBadge(),
                 if (_stage == 4) _buildCustomerTimerCard(),
                 if (_stage == 3 || _stage == 4) _buildMapSection(),
                 if (_stage == 5) _buildCompletedSummary(),
@@ -496,6 +544,31 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           ),
         ),
         const Spacer(),
+        if (_data.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _categoryType == 'A'
+                  ? const Color(0xFFEFF6FF)
+                  : _categoryType == 'C'
+                  ? const Color(0xFFF3EEFF)
+                  : const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _categoryTypeLabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _categoryType == 'A'
+                    ? _C.blue
+                    : _categoryType == 'C'
+                    ? const Color(0xFF7C3AED)
+                    : const Color(0xFF059669),
+              ),
+            ),
+          ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
@@ -1063,6 +1136,15 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       rows: [
         _SumRow(label: 'Request ID', value: '#$shortId'),
         _SumRow(label: 'Category', value: category),
+        _SumRow(
+          label: 'Service Type',
+          value: _categoryTypeLabel,
+          valueColor: _categoryType == 'A'
+              ? _C.blue
+              : _categoryType == 'C'
+              ? const Color(0xFF7C3AED)
+              : const Color(0xFF059669),
+        ),
         _SumRow(label: 'Address', value: address),
         _SumRow(label: estLabel, value: estVal, valueColor: estColor),
         if (_stage >= 2)
@@ -1256,41 +1338,62 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       );
 
   Widget _buildPaymentConfirmedBadge() {
-  final isJobDone = _data['status'] == 'job_done';
-  return Container(
-    margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: const Color(0xFFECFDF5),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
-    ),
-    child: Row(children: [
-      Container(
-        width: 32, height: 32,
-        decoration: BoxDecoration(color: _C.green.withOpacity(0.12), shape: BoxShape.circle),
-        child: Icon(
-          isJobDone ? Icons.celebration_rounded : Icons.check_circle_rounded,
-          size: 16, color: _C.green,
-        ),
+    final isJobDone = _data['status'] == 'job_done';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
       ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(
-            isJobDone ? 'Quotation Completed' : 'Payment Confirmed',
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.green),
+      child: Row(
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: _C.green.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isJobDone
+                  ? Icons.celebration_rounded
+                  : Icons.check_circle_rounded,
+              size: 16,
+              color: _C.green,
+            ),
           ),
-          Text(
-            isJobDone ? 'The worker has successfully completed the job.' : 'LKR ${_fmt(_totalAmount)} paid successfully',
-            style: const TextStyle(fontSize: 10, color: Color(0xFF166534)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isJobDone ? 'Quotation Completed' : 'Payment Confirmed',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _C.green,
+                  ),
+                ),
+                Text(
+                  isJobDone
+                      ? 'The worker has successfully completed the job.'
+                      : 'LKR ${_fmt(_totalAmount)} paid successfully',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Color(0xFF166534),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ]),
+          const Icon(Icons.verified_rounded, size: 18, color: _C.green),
+        ],
       ),
-      const Icon(Icons.verified_rounded, size: 18, color: _C.green),
-    ]),
-  );
-}
+    );
+  }
 
   Widget _buildCustomerTimerCard() => Container(
     margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1564,12 +1667,14 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           _SumRow(label: 'Description', value: description),
         ]),
         _detailCard('PAYMENT SUMMARY', [
-          _SumRow(
-            label: 'Inspection Fee',
-            value: 'LKR ${_fmt(_inspectionFee)}',
-          ),
-          _SumRow(label: 'Distance Fee', value: 'LKR ${_fmt(_distanceFee)}'),
-          _SumRow(label: 'Service Fee', value: 'LKR ${_fmt(_serviceFee)}'),
+          if (_hasInspectionFee) ...[
+            _SumRow(
+              label: 'Inspection Fee',
+              value: 'LKR ${_fmt(_inspectionFee)}',
+            ),
+            _SumRow(label: 'Distance Fee', value: 'LKR ${_fmt(_distanceFee)}'),
+            _SumRow(label: 'Service Fee', value: 'LKR ${_fmt(_serviceFee)}'),
+          ],
           _SumRow(
             label: 'Total Paid',
             value: 'LKR ${_fmt(_totalAmount)}',
@@ -1867,20 +1972,20 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         );
       case 8:
       case 9:
-  return _gradBtn(
-    label: 'Leave a Review',
-    colors: [_C.gradA, _C.gradB],
-    onTap: () => Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ReviewScreen(
-          requestId: _requestId,
-          requestData: _data,
-          isWorker: false,
-        ),
-      ),
-    ),
-  );
+        return _gradBtn(
+          label: 'Leave a Review',
+          colors: [_C.gradA, _C.gradB],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ReviewScreen(
+                requestId: _requestId,
+                requestData: _data,
+                isWorker: false,
+              ),
+            ),
+          ),
+        );
       default:
         return _outlineBtn(label: 'Cancel Request', onTap: _handleCancel);
     }

@@ -4,11 +4,50 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'worker_job_progress_screen.dart';
+import '../category_b/worker_quotation_screen.dart';
+import '../category_b/worker_job_screen.dart';
+import '../category_c/worker_subscription_screen.dart';
+import '../category_c/worker_subscription_mgmt_screen.dart';
 
 class WorkerRequestDetailScreen extends StatelessWidget {
   final Map<String, dynamic> data;
 
   const WorkerRequestDetailScreen({super.key, required this.data});
+
+  String _categoryType() {
+    // Always trust the stored categoryType field first
+    final stored = (data['categoryType'] as String?)?.trim().toUpperCase();
+    if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
+
+    // Fall back to category name detection
+    // Cat C is distinctive (subscription/care workers)
+    const catC = {
+      'teacher',
+      'tutor',
+      'caregiver',
+      'care giver',
+      'baby sitter',
+      'babysitter',
+      'nurse',
+      'nanny',
+    };
+    // Cat B is distinctive (fixed-price service workers)
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
+    final lower = (data['category'] as String? ?? '').toLowerCase().trim();
+    if (catC.contains(lower)) return 'C';
+    if (catB.contains(lower)) return 'B';
+    // Default to Cat A — inspection-based workers
+    // This is the safe fallback so existing Cat A requests never break
+    return 'A';
+  }
 
   String initials(String name) {
     final p = name.split(' ');
@@ -17,15 +56,15 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name      = data['customerName'] ?? 'Customer';
-    final phone     = data['phone']        ?? '+94 --------';
-    final address   = data['address']      ?? '';
-    final desc      = data['description']  ?? '';
-    final requestId = data['id']           ?? '';
-    final status    = data['status']       ?? 'pending';
+    final name = data['customerName'] ?? 'Customer';
+    final phone = data['phone'] ?? '+94 --------';
+    final address = data['address'] ?? '';
+    final desc = data['description'] ?? '';
+    final requestId = data['id'] ?? '';
+    final status = data['status'] ?? 'pending';
     final timestamp = data['createdAt'];
 
-    final double lat = (data['latitude']  as num?)?.toDouble() ?? 0.0;
+    final double lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
     final double lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
     final bool hasLocation = lat != 0.0 && lng != 0.0;
 
@@ -34,7 +73,7 @@ class WorkerRequestDetailScreen extends StatelessWidget {
     String formattedDate = '';
     String formattedTime = '';
     if (timestamp != null && timestamp is Timestamp) {
-      final dt   = timestamp.toDate();
+      final dt = timestamp.toDate();
       formattedDate = DateFormat('dd MMM yyyy').format(dt);
       formattedTime = DateFormat('hh:mm a').format(dt);
     }
@@ -47,211 +86,437 @@ class WorkerRequestDetailScreen extends StatelessWidget {
       }
     }
 
-    final isActiveJob = status != 'pending' && status != 'cancelled' && status != 'rejected';
+    final isActiveJob =
+        status != 'pending' && status != 'cancelled' && status != 'rejected';
 
     return Scaffold(
-      body: Stack(children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF5C75F0), Color(0xFF6C56F0)]),
-          ),
-        ),
-
-        SafeArea(
-          child: Column(children: [
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back, color: Colors.white),
-                ),
-                const SizedBox(width: 10),
-                Text('Request Details',
-                    style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ]),
-            ),
-
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF4F6FA),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(children: [
-
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                      child: Row(children: [
-                        CircleAvatar(
-                          backgroundColor: const Color(0xFF469FEF),
-                          child: Text(initials(name), style: const TextStyle(color: Colors.white)),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(phone, style: const TextStyle(fontSize: 12)),
-                          Text('Request ID: $requestId', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                        ]),
-                      ]),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Row(children: [
-                      Expanded(child: _infoBox('Date', formattedDate)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _infoBox('Time', formattedTime)),
-                    ]),
-
-                    const SizedBox(height: 12),
-
-                    if (hasLocation) ...[
-                      SizedBox(
-                        height: 200,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: GoogleMap(
-                            initialCameraPosition: CameraPosition(target: LatLng(lat, lng), zoom: 15),
-                            markers: {Marker(markerId: const MarkerId('customerLocation'), position: LatLng(lat, lng))},
-                            zoomControlsEnabled: false,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ] else ...[
-                      Container(
-                        height: 60,
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E6F0))),
-                        child: const Center(child: Text('Location not available', style: TextStyle(fontSize: 12, color: Colors.grey))),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-
-                    _sectionCard('Address', address),
-                    const SizedBox(height: 12),
-                    _sectionCard('Description', desc),
-                    const SizedBox(height: 12),
-
-                    if (images.isNotEmpty)
-                      Container(
-                        width: double.infinity, padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          const Text('Inspection Photos', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          const SizedBox(height: 10),
-                          Wrap(spacing: 10, runSpacing: 10,
-                            children: images.map((img) => GestureDetector(
-                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FullScreenImage(imageUrl: img))),
-                              child: ClipRRect(borderRadius: BorderRadius.circular(10),
-                                  child: Image.network(img, height: 90, width: 90, fit: BoxFit.cover)),
-                            )).toList(),
-                          ),
-                        ]),
-                      ),
-
-                    const SizedBox(height: 80),
-                  ]),
-                ),
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Color(0xFF469FEF),
+                  Color(0xFF5C75F0),
+                  Color(0xFF6C56F0),
+                ],
               ),
             ),
+          ),
 
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: Colors.white,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Row(children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(
+                          Icons.arrow_back,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Request Details',
+                        style: GoogleFonts.poppins(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-                  if (status == 'pending')
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
-                            'status': 'rejected', 'rejectedBy': 'worker', 'rejectedAt': FieldValue.serverTimestamp(),
-                          });
-                          nav.pop();
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        child: const Text('Reject', style: TextStyle(color: Colors.white)),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF4F6FA),
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(30),
                       ),
                     ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: const Color(0xFF469FEF),
+                                  child: Text(
+                                    initials(name),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      phone,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    Text(
+                                      'Request ID: $requestId',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
 
-                  if (status == 'accepted' && canCancel)
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
-                            'status': 'cancelled', 'cancelledBy': 'worker', 'cancelledAt': FieldValue.serverTimestamp(),
-                          });
-                          nav.pop();
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                        child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+                          const SizedBox(height: 12),
+
+                          Row(
+                            children: [
+                              Expanded(child: _infoBox('Date', formattedDate)),
+                              const SizedBox(width: 10),
+                              Expanded(child: _infoBox('Time', formattedTime)),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          if (hasLocation) ...[
+                            SizedBox(
+                              height: 200,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: GoogleMap(
+                                  initialCameraPosition: CameraPosition(
+                                    target: LatLng(lat, lng),
+                                    zoom: 15,
+                                  ),
+                                  markers: {
+                                    Marker(
+                                      markerId: const MarkerId(
+                                        'customerLocation',
+                                      ),
+                                      position: LatLng(lat, lng),
+                                    ),
+                                  },
+                                  zoomControlsEnabled: false,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ] else ...[
+                            Container(
+                              height: 60,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: const Color(0xFFE2E6F0),
+                                ),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'Location not available',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+
+                          _sectionCard('Address', address),
+                          const SizedBox(height: 12),
+                          _sectionCard('Description', desc),
+                          const SizedBox(height: 12),
+
+                          if (images.isNotEmpty)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Inspection Photos',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 10,
+                                    runSpacing: 10,
+                                    children: images
+                                        .map(
+                                          (img) => GestureDetector(
+                                            onTap: () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) => FullScreenImage(
+                                                  imageUrl: img,
+                                                ),
+                                              ),
+                                            ),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              child: Image.network(
+                                                img,
+                                                height: 90,
+                                                width: 90,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                          const SizedBox(height: 80),
+                        ],
                       ),
                     ),
+                  ),
+                ),
 
-                  if (status == 'pending') const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.white,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          if (status == 'pending')
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final nav = Navigator.of(context);
+                                  await FirebaseFirestore.instance
+                                      .collection('requests')
+                                      .doc(requestId)
+                                      .update({
+                                        'status': 'rejected',
+                                        'rejectedBy': 'worker',
+                                        'rejectedAt':
+                                            FieldValue.serverTimestamp(),
+                                      });
+                                  nav.pop();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                child: const Text(
+                                  'Reject',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ),
 
-                  if (status == 'pending')
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final nav = Navigator.of(context);
-                          await FirebaseFirestore.instance.collection('requests').doc(requestId).update({
-                            'status': 'accepted', 'acceptedAt': FieldValue.serverTimestamp(),
-                          });
-                          nav.pop();
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6C56F0)),
-                        child: const Text('Accept Request', style: TextStyle(color: Colors.white)),
+                          if (status == 'accepted' && canCancel)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final nav = Navigator.of(context);
+                                  await FirebaseFirestore.instance
+                                      .collection('requests')
+                                      .doc(requestId)
+                                      .update({
+                                        'status': 'cancelled',
+                                        'cancelledBy': 'worker',
+                                        'cancelledAt':
+                                            FieldValue.serverTimestamp(),
+                                      });
+                                  nav.pop();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ),
+
+                          if (status == 'pending') const SizedBox(width: 10),
+
+                          if (status == 'pending')
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final nav = Navigator.of(context);
+                                  await FirebaseFirestore.instance
+                                      .collection('requests')
+                                      .doc(requestId)
+                                      .update({
+                                        'status': 'accepted',
+                                        'acceptedAt':
+                                            FieldValue.serverTimestamp(),
+                                      });
+                                  nav.pop();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF6C56F0),
+                                ),
+                                child: const Text(
+                                  'Accept Request',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ),
+
+                          if (isActiveJob)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  final catType = _categoryType();
+                                  if (catType == 'B') {
+                                    // pending quotation → send quotation; accepted/paid → job screen
+                                    if (status == 'pending' ||
+                                        status == 'accepted') {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryBWorkerQuotationScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryBWorkerJobScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  } else if (catType == 'C') {
+                                    if (status == 'pending' ||
+                                        status == 'accepted' ||
+                                        status == 'quotation_sent') {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryCWorkerSubscriptionScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryCWorkerSubscriptionMgmtScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    // Cat A — existing flow
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => WorkerJobProgressScreen(
+                                          requestId: requestId,
+                                          requestData: data,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4A98EF),
+                                ),
+                                child: const Text(
+                                  'View Progress',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-
-                  if (isActiveJob)
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(
-                              builder: (_) => WorkerJobProgressScreen(requestId: requestId, requestData: data)));
-                        },
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF4A98EF)),
-                        child: const Text('View Progress', style: TextStyle(color: Colors.white)),
-                      ),
-                    ),
-                ]),
-              ]),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _sectionCard(String title, String value) => Container(
-        width: double.infinity, padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-          const SizedBox(height: 6),
-          Text(value),
-        ]),
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 6),
+        Text(value),
+      ],
+    ),
+  );
 
   Widget _infoBox(String title, String value) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 10)),
-          const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ]),
-      );
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 10)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+      ],
+    ),
+  );
 }
 
 class FullScreenImage extends StatelessWidget {
@@ -260,8 +525,11 @@ class FullScreenImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-        body: Center(child: InteractiveViewer(child: Image.network(imageUrl))),
-      );
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.black,
+      iconTheme: const IconThemeData(color: Colors.white),
+    ),
+    body: Center(child: InteractiveViewer(child: Image.network(imageUrl))),
+  );
 }

@@ -2,6 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/utils/week_helper.dart';
 import '../../../models/user_address.dart';
@@ -44,6 +46,126 @@ class _HomeScreenState extends State<HomeScreen> {
   bool under30Min = false;
   bool highestRatedOnly = false;
 
+  // ── Book Again ────────────────────────────────────────────────────────────
+  List<Worker> _bookAgainWorkers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookAgainWorkers();
+  }
+
+  /// Fetches the customer's past completed requests, deduplicates by workerId,
+  /// and builds Worker objects. Also fetches the worker's live profile photo
+  /// from the 'workers' collection so the avatar is always up to date.
+  Future<void> _loadBookAgainWorkers() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      // Fetch all completed requests for this customer.
+      // We include every terminal status so Cat A (quotation_paid/declined),
+      // Cat B (job_done/completed) and Cat C (completed) all appear.
+      // NOTE: whereIn + orderBy requires a composite index in Firestore.
+      // To avoid that requirement we fetch without orderBy and sort in-memory.
+      final snap = await FirebaseFirestore.instance
+          .collection('requests')
+          .where('customerId', isEqualTo: uid)
+          .where(
+            'status',
+            whereIn: [
+              'completed',
+              'job_done',
+              'quotation_paid',
+              'quotation_declined',
+            ],
+          )
+          .get();
+
+      // Sort in-memory newest first (avoids composite index requirement)
+      final docs = [...snap.docs]
+        ..sort((a, b) {
+          final ta =
+              (a.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ??
+              0;
+          final tb =
+              (b.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ??
+              0;
+          return tb.compareTo(ta);
+        });
+
+      // Deduplicate — keep only the most recent request per workerId
+      final Map<String, Map<String, dynamic>> seen = {};
+      for (final doc in docs) {
+        final d = doc.data();
+        final wid = d['workerId'] as String? ?? '';
+        if (wid.isNotEmpty && !seen.containsKey(wid)) {
+          seen[wid] = d;
+        }
+      }
+
+      debugPrint(
+        '[BookAgain] total docs: \${snap.docs.length}, unique workers: \${seen.length}',
+      );
+      if (seen.isEmpty) return;
+
+      // Fetch live worker docs in parallel to get profilePhotoUrl + travelFee
+      final workerFutures = seen.keys.map(
+        (wid) =>
+            FirebaseFirestore.instance.collection('workers').doc(wid).get(),
+      );
+      final workerDocs = await Future.wait(workerFutures);
+      final Map<String, Map<String, dynamic>> workerData = {};
+      for (final doc in workerDocs) {
+        if (doc.exists) workerData[doc.id] = doc.data()!;
+      }
+
+      final List<Worker> result = [];
+      for (final entry in seen.entries) {
+        final wid = entry.key;
+        final req = entry.value;
+        final wd = workerData[wid] ?? {};
+
+        result.add(
+          Worker(
+            id: wid,
+            name: req['workerName'] as String? ?? '',
+            category: req['category'] as String? ?? '',
+            rating:
+                (wd['averageRating'] as num?)?.toDouble() ??
+                (req['workerRating'] as num?)?.toDouble() ??
+                0.0,
+            ratingCount: (wd['totalReviews'] as num?)?.toInt() ?? 0,
+            completedJobsCount:
+                (wd['completedJobsCount'] as num?)?.toInt() ?? 0,
+            distanceKm: 0, // not relevant for book-again display
+            travelMinutes: 0,
+            travelFee:
+                (wd['travelFee'] as num?)?.toDouble() ??
+                (req['travelFee'] as num?)?.toDouble() ??
+                0.0,
+            hasOffer: (wd['hasOffer'] as bool?) ?? false,
+            offerType: wd['offerType'] as String? ?? '',
+            offerDetails: wd['offerDetails'] as String? ?? '',
+            isFeatured: (wd['isFeatured'] as bool?) ?? false,
+            featuredWeekKey: wd['featuredWeekKey'] as String? ?? '',
+            isFavorite: false, // updated by favorites stream below
+            profilePhotoUrl:
+                (wd['profileImageUrl'] as String?) ??
+                (wd['profilePhotoUrl'] as String?) ??
+                '',
+            address: wd['address'] as String? ?? '',
+          ),
+        );
+      }
+
+      if (mounted) setState(() => _bookAgainWorkers = result);
+    } catch (e) {
+      debugPrint('Book Again load error: $e');
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   final List<_CategoryData> categories = const [
     _CategoryData(label: 'All', imagePath: ''),
     _CategoryData(label: 'Mechanic', imagePath: 'assets/icons/mechanic.png'),
@@ -79,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (under30Min)
       filtered = filtered.where((w) => w.travelMinutes <= 30).toList();
     if (highestRatedOnly)
-      filtered = filtered.where((w) => w.rating >= 4.8).toList();
+      filtered = filtered.where((w) => w.rating >= 4.0).toList();
     return filtered;
   }
 
@@ -336,7 +458,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   )
                   .toList(),
             );
-            final bookAgain = applyFilters(const <Worker>[]);
+
+            // ── Book Again: use past-order workers, update isFavorite from stream
+            final bookAgain = applyFilters(
+              _bookAgainWorkers.map((w) {
+                // Check if this worker also appears in the live list (for distance/travel)
+                final live = workersWithFavorites
+                    .where((lw) => lw.id == w.id)
+                    .firstOrNull;
+                return Worker(
+                  id: w.id,
+                  name: w.name,
+                  category: w.category,
+                  rating: live?.rating ?? w.rating,
+                  ratingCount: live?.ratingCount ?? w.ratingCount,
+                  completedJobsCount:
+                      live?.completedJobsCount ?? w.completedJobsCount,
+                  distanceKm: live?.distanceKm ?? w.distanceKm,
+                  travelMinutes: live?.travelMinutes ?? w.travelMinutes,
+                  travelFee: live?.travelFee ?? w.travelFee,
+                  hasOffer: live?.hasOffer ?? w.hasOffer,
+                  offerType: live?.offerType ?? w.offerType,
+                  offerDetails: live?.offerDetails ?? w.offerDetails,
+                  isFeatured: live?.isFeatured ?? w.isFeatured,
+                  featuredWeekKey: live?.featuredWeekKey ?? w.featuredWeekKey,
+                  isFavorite: favoriteIds.contains(w.id),
+                  profilePhotoUrl: live?.profilePhotoUrl ?? w.profilePhotoUrl,
+                  address: live?.address ?? w.address,
+                );
+              }).toList(),
+            );
+
             final nearby = applyFilters(
               workersWithFavorites.where((w) => w.distanceKm <= 10).toList()
                 ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm)),
@@ -344,10 +496,13 @@ class _HomeScreenState extends State<HomeScreen> {
             final offers = applyFilters(
               workersWithFavorites.where((w) => w.hasOffer).toList(),
             );
-            final highestRated = applyFilters(
-              [...workersWithFavorites]
-                ..sort((a, b) => b.rating.compareTo(a.rating)),
-            ).where((w) => w.rating >= 4.8).toList();
+            final highestRated =
+                applyFilters(
+                      [...workersWithFavorites]
+                        ..sort((a, b) => b.rating.compareTo(a.rating)),
+                    )
+                    .where((w) => w.rating > 0)
+                    .toList(); // show all rated workers, sorted by rating
             final categoryListResults = applyFilters(
               [...workersWithFavorites]
                 ..sort((a, b) => a.travelMinutes.compareTo(b.travelMinutes)),
@@ -517,21 +672,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _buildListPreview(featured, 2),
                                 const SizedBox(height: 26),
 
-                                _SectionHeader(
-                                  title: 'Book again',
-                                  onSeeAll: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SectionWorkersScreen(
-                                        title: 'Book again',
-                                        workers: bookAgain,
+                                // ── Book Again — only shown when customer has past orders
+                                if (bookAgain.isNotEmpty) ...[
+                                  _SectionHeader(
+                                    title: 'Book again',
+                                    onSeeAll: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => SectionWorkersScreen(
+                                          title: 'Book again',
+                                          workers: bookAgain,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(height: 12),
-                                _buildGridPreview(bookAgain, 4),
-                                const SizedBox(height: 26),
+                                  const SizedBox(height: 12),
+                                  _buildGridPreview(bookAgain, 4),
+                                  const SizedBox(height: 26),
+                                ],
 
                                 _SectionHeader(
                                   title: 'Workers near you',

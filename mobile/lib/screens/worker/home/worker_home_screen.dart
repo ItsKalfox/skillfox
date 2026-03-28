@@ -24,7 +24,12 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   bool _isLoadingProfile = true;
 
   Set<Marker> _markers = {};
-  List<Map<String, dynamic>> _nearbyRequests = [];
+  List<Map<String, dynamic>> _pendingRequests = [];
+
+  // ── Live completed jobs count (job_done status from requests) ──
+  int _completedJobsCount = 0;
+  StreamSubscription? _completedJobsSubscription;
+
   StreamSubscription? _requestSubscription;
 
   @override
@@ -32,11 +37,14 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     super.initState();
     _loadWorkerProfile();
     _getCurrentLocation();
+    _listenToPendingRequests();
+    _listenToCompletedJobs(); // ← new
   }
 
   @override
   void dispose() {
     _requestSubscription?.cancel();
+    _completedJobsSubscription?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
@@ -60,7 +68,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-
       if (permission == LocationPermission.deniedForever) return;
 
       final position = await Geolocator.getCurrentPosition(
@@ -73,7 +80,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       });
 
       _updateWorkerLocation(position);
-      _listenToNearbyRequests(position);
+      _rebuildMarkers();
     } catch (e) {
       debugPrint('Location error: $e');
     }
@@ -90,139 +97,99 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     });
   }
 
-  void _listenToNearbyRequests(Position position) {
+  void _listenToPendingRequests() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
     _requestSubscription = _firestore
-        .collection('service_requests')
+        .collection('requests')
+        .where('workerId', isEqualTo: uid)
         .where('status', isEqualTo: 'pending')
         .snapshots()
         .listen((snapshot) {
           if (!mounted) return;
 
           final requests = snapshot.docs.map((doc) {
-            final data = doc.data();
+            final data = Map<String, dynamic>.from(doc.data());
             data['id'] = doc.id;
             return data;
           }).toList();
 
-          final nearby = requests.where((req) {
-            final lat = req['customerLat'] as double?;
-            final lng = req['customerLng'] as double?;
-            if (lat == null || lng == null) return false;
-
-            final distance = Geolocator.distanceBetween(
-              position.latitude,
-              position.longitude,
-              lat,
-              lng,
-            );
-            return distance <= 10000;
-          }).toList();
-
           setState(() {
-            _nearbyRequests = nearby;
-            _buildMarkers(position, nearby);
+            _pendingRequests = requests;
+          });
+
+          _rebuildMarkers();
+        });
+  }
+
+  // ── Counts all requests with status == 'job_done' for this worker ──
+  void _listenToCompletedJobs() {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    _completedJobsSubscription = _firestore
+        .collection('requests')
+        .where('workerId', isEqualTo: uid)
+        .where('status', isEqualTo: 'job_done')
+        .snapshots()
+        .listen((snapshot) {
+          if (!mounted) return;
+          setState(() {
+            _completedJobsCount = snapshot.docs.length;
           });
         });
   }
 
-  void _buildMarkers(Position myPos, List<Map<String, dynamic>> requests) {
+  void _rebuildMarkers() {
     final markers = <Marker>{};
 
-    markers.add(
-      Marker(
-        markerId: const MarkerId('my_location'),
-        position: LatLng(myPos.latitude, myPos.longitude),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        infoWindow: const InfoWindow(title: 'You are here'),
-      ),
-    );
+    if (_currentPosition != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('my_location'),
+          position: LatLng(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+          infoWindow: const InfoWindow(title: 'You (Worker)'),
+        ),
+      );
+    }
 
-    for (final req in requests) {
-      final lat = req['customerLat'] as double?;
-      final lng = req['customerLng'] as double?;
+    for (final req in _pendingRequests) {
+      final lat = (req['latitude'] as num?)?.toDouble();
+      final lng = (req['longitude'] as num?)?.toDouble();
       if (lat == null || lng == null) continue;
 
       markers.add(
         Marker(
-          markerId: MarkerId(req['id']),
+          markerId: MarkerId(req['id'] as String),
           position: LatLng(lat, lng),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueYellow,
+          ),
           infoWindow: InfoWindow(
-            title: req['customerName'] ?? 'Customer',
-            snippet: req['serviceType'] ?? '',
+            title: req['customerName'] as String? ?? 'Customer',
+            snippet:
+                req['category'] as String? ??
+                req['serviceType'] as String? ??
+                '',
           ),
         ),
       );
     }
 
-    setState(() {
-      _markers = markers;
-    });
-  }
-
-  Future<void> _acceptRequest(
-    String requestId,
-    Map<String, dynamic> request,
-  ) async {
-    final uid = _auth.currentUser?.uid;
-    if (uid == null) return;
-
-    try {
-      await _firestore.collection('service_requests').doc(requestId).update({
-        'status': 'accepted',
-        'workerId': uid,
-        'workerName': _workerData?['name'] ?? '',
-        'acceptedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Request from ${request['customerName'] ?? 'Customer'} accepted!',
-          ),
-          backgroundColor: const Color(0xFF22C55E),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to accept: $e')));
-    }
-  }
-
-  Future<void> _declineRequest(
-    String requestId,
-    Map<String, dynamic> request,
-  ) async {
-    try {
-      await _firestore.collection('service_requests').doc(requestId).update({
-        'status': 'declined',
-        'declinedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Request from ${request['customerName'] ?? 'Customer'} declined.',
-          ),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to decline: $e')));
+    if (mounted) {
+      setState(() => _markers = markers);
     }
   }
 
   String _distanceLabel(Map<String, dynamic> request) {
     if (_currentPosition == null) return '';
-    final lat = request['customerLat'] as double?;
-    final lng = request['customerLng'] as double?;
+    final lat = (request['latitude'] as num?)?.toDouble();
+    final lng = (request['longitude'] as num?)?.toDouble();
     if (lat == null || lng == null) return '';
 
     final dist = Geolocator.distanceBetween(
@@ -236,7 +203,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     return '${(dist / 1000).toStringAsFixed(1)}km away';
   }
 
-  /// Navigate to CustomerDetailScreen and handle accept/decline result
   void _openCustomerDetail(Map<String, dynamic> request) async {
     final requestId = request['id'] as String;
 
@@ -246,9 +212,36 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     );
 
     if (result == 'accepted') {
-      await _acceptRequest(requestId, request);
+      await _firestore.collection('requests').doc(requestId).update({
+        'status': 'accepted',
+        'workerId': _auth.currentUser?.uid,
+        'workerName': _workerData?['name'] ?? '',
+        'acceptedAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Request from ${request['customerName'] ?? 'Customer'} accepted!',
+          ),
+          backgroundColor: const Color(0xFF22C55E),
+        ),
+      );
     } else if (result == 'declined') {
-      await _declineRequest(requestId, request);
+      await _firestore.collection('requests').doc(requestId).update({
+        'status': 'rejected',
+        'rejectedBy': 'worker',
+        'rejectedAt': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Request from ${request['customerName'] ?? 'Customer'} declined.',
+          ),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
@@ -260,11 +253,10 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
 
     final name = _workerData?['name'] ?? 'Worker';
     final category = _workerData?['category'] ?? '';
-    final rating = (_workerData?['rating'] ?? 0.0).toDouble();
     final profilePhoto = _workerData?['profilePhotoUrl'] ?? '';
     final coverPhoto = _workerData?['coverPhotoUrl'] ?? '';
     final isAvailable = _workerData?['isAvailable'] ?? false;
-    final completedJobs = _workerData?['completedJobsCount'] ?? 0;
+    // completedJobsCount from _workerData removed — now using _completedJobsCount
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F4FA),
@@ -274,7 +266,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             child: _buildProfileHeader(
               name: name,
               category: category,
-              rating: rating,
               profilePhoto: profilePhoto,
               coverPhoto: coverPhoto,
               isAvailable: isAvailable,
@@ -285,8 +276,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: _buildStatsRow(
-                completedJobs: completedJobs,
-                nearbyCount: _nearbyRequests.length,
+                nearbyCount: _pendingRequests.length,
                 isAvailable: isAvailable,
               ),
             ),
@@ -298,7 +288,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               child: Row(
                 children: [
                   const Text(
-                    'Nearby Requests',
+                    'Pending Requests',
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
@@ -327,7 +317,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                         ),
                         const SizedBox(width: 5),
                         Text(
-                          '${_nearbyRequests.length} pending',
+                          '${_pendingRequests.length} pending',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -346,42 +336,76 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: SizedBox(
-                  height: 220,
-                  child: _currentPosition == null
-                      ? Container(
-                          color: const Color(0xFFE8EAF3),
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        )
-                      : GoogleMap(
-                          initialCameraPosition: CameraPosition(
-                            target: LatLng(
-                              _currentPosition!.latitude,
-                              _currentPosition!.longitude,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: SizedBox(
+                      height: 240,
+                      child: _currentPosition == null
+                          ? Container(
+                              color: const Color(0xFFE8EAF3),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 10),
+                                    Text(
+                                      'Getting your location…',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF8A8A8A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : GoogleMap(
+                              initialCameraPosition: CameraPosition(
+                                target: LatLng(
+                                  _currentPosition!.latitude,
+                                  _currentPosition!.longitude,
+                                ),
+                                zoom: 13,
+                              ),
+                              markers: _markers,
+                              onMapCreated: (controller) {
+                                _mapController = controller;
+                              },
+                              myLocationEnabled: false,
+                              zoomControlsEnabled: true,
+                              zoomGesturesEnabled: true,
+                              scrollGesturesEnabled: true,
+                              mapToolbarEnabled: false,
                             ),
-                            zoom: 13,
-                          ),
-                          markers: _markers,
-                          onMapCreated: (controller) {
-                            _mapController = controller;
-                          },
-                          myLocationEnabled: false,
-                          zoomControlsEnabled: false,
-                          mapToolbarEnabled: false,
-                        ),
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _MapLegendDot(
+                        color: const Color(0xFF4B7DF3),
+                        label: 'You (Worker)',
+                      ),
+                      const SizedBox(width: 16),
+                      _MapLegendDot(
+                        color: const Color(0xFFF5C518),
+                        label: 'Pending Customer',
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-          // ── Customer request list ──
-          _nearbyRequests.isEmpty
+          // ── Pending request cards ──
+          _pendingRequests.isEmpty
               ? SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -398,7 +422,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                           ),
                           const SizedBox(height: 10),
                           const Text(
-                            'No nearby requests right now',
+                            'No pending requests right now',
                             style: TextStyle(
                               color: Color(0xFF8A8A8A),
                               fontSize: 14,
@@ -411,16 +435,15 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                 )
               : SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final request = _nearbyRequests[index];
+                    final request = _pendingRequests[index];
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      // ✅ Tap the card → go to CustomerDetailScreen
                       child: GestureDetector(
                         onTap: () => _openCustomerDetail(request),
                         child: _buildRequestCard(request),
                       ),
                     );
-                  }, childCount: _nearbyRequests.length),
+                  }, childCount: _pendingRequests.length),
                 ),
 
           const SliverToBoxAdapter(child: SizedBox(height: 120)),
@@ -432,7 +455,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   Widget _buildProfileHeader({
     required String name,
     required String category,
-    required double rating,
     required String profilePhoto,
     required String coverPhoto,
     required bool isAvailable,
@@ -441,7 +463,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
       clipBehavior: Clip.none,
       alignment: Alignment.topCenter,
       children: [
-        // Cover gradient
         Container(
           height: 220,
           decoration: const BoxDecoration(
@@ -462,7 +483,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               : null,
         ),
 
-        // Top bar
         Positioned(
           top: 0,
           left: 0,
@@ -504,7 +524,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // White card curve
         Positioned(
           top: 160,
           left: 0,
@@ -518,7 +537,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // Profile avatar
         Positioned(
           top: 110,
           child: Container(
@@ -540,7 +558,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           ),
         ),
 
-        // ✅ Name → Category → Stars (all three, in order)
         Positioned(
           top: 215,
           left: 0,
@@ -555,33 +572,26 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                   color: Color(0xFF1A1A2E),
                 ),
               ),
-              const SizedBox(height: 4),
-              // ── CATEGORY (shown between name and stars) ──
+              const SizedBox(height: 6),
               if (category.isNotEmpty)
-                Text(
-                  category,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF4B7DF3),
-                    fontWeight: FontWeight.w600,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
                   ),
-                ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    rating.toStringAsFixed(1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF0FF),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    category,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
+                      fontSize: 13,
+                      color: Color(0xFF4B7DF3),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ),
+                ),
             ],
           ),
         ),
@@ -591,18 +601,14 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     );
   }
 
-  Widget _buildStatsRow({
-    required int completedJobs,
-    required int nearbyCount,
-    required bool isAvailable,
-  }) {
+  Widget _buildStatsRow({required int nearbyCount, required bool isAvailable}) {
     return Row(
       children: [
         Expanded(
           child: _StatCard(
             icon: Icons.list_alt_rounded,
-            value: completedJobs.toString(),
-            label: 'Requests',
+            value: _completedJobsCount.toString(), // ← live from requests
+            label: 'Completed',
             iconColor: const Color(0xFF4B7DF3),
             bgColor: const Color(0xFFEEF0FF),
           ),
@@ -610,11 +616,11 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _StatCard(
-            icon: Icons.near_me_rounded,
+            icon: Icons.pending_actions_rounded,
             value: nearbyCount.toString(),
-            label: 'Within 5km',
-            iconColor: const Color(0xFF22C55E),
-            bgColor: const Color(0xFFEAFBF0),
+            label: 'Pending',
+            iconColor: const Color(0xFFF59E0B),
+            bgColor: const Color(0xFFFEF3C7),
           ),
         ),
         const SizedBox(width: 12),
@@ -639,10 +645,13 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 
   Widget _buildRequestCard(Map<String, dynamic> request) {
-    final customerName = request['customerName'] ?? 'Customer';
-    final serviceType = request['serviceType'] ?? 'Service Request';
-    final customerPhoto = request['customerPhotoUrl'] ?? '';
-    final description = request['description'] ?? '';
+    final customerName = request['customerName'] as String? ?? 'Customer';
+    final category =
+        request['category'] as String? ??
+        request['serviceType'] as String? ??
+        'Service Request';
+    final customerPhoto = request['customerPhotoUrl'] as String? ?? '';
+    final description = request['description'] as String? ?? '';
     final distLabel = _distanceLabel(request);
     final timestamp = request['createdAt'] as Timestamp?;
     final timeAgo = timestamp != null ? _timeAgo(timestamp.toDate()) : '';
@@ -694,7 +703,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      serviceType,
+                      category,
                       style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF4B7DF3),
@@ -740,7 +749,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               ),
             ],
           ),
-
           if (description.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
@@ -754,10 +762,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               ),
             ),
           ],
-
           const SizedBox(height: 14),
-
-          // ✅ Tap hint chevron
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -791,6 +796,42 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   }
 }
 
+// ─────────────────────────────────────────
+// Map Legend Dot
+// ─────────────────────────────────────────
+class _MapLegendDot extends StatelessWidget {
+  final Color color;
+  final String label;
+
+  const _MapLegendDot({required this.color, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF555555),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// Stat Card
+// ─────────────────────────────────────────
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String value;
