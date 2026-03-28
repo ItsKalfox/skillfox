@@ -92,18 +92,56 @@ class _ReviewScreenState extends State<ReviewScreen> {
           final avgRating = totalRatings / reviewsSnap.docs.length;
 
           await FirebaseFirestore.instance
-              .collection('workers')
-              .doc(workerId)
-              .update({
-            'averageRating': double.parse(avgRating.toStringAsFixed(1)),
-            'totalReviews':  reviewsSnap.docs.length,
-          });
+    .collection('workers')
+                .doc(workerId)
+                .set({
+              'averageRating': double.parse(avgRating.toStringAsFixed(1)),
+              'totalReviews':  reviewsSnap.docs.length,
+            }, SetOptions(merge: true));
         }
       }
 
       if (mounted) {
-        Navigator.of(context).popUntil((r) => r.isFirst);
-      }
+  setState(() => _loading = false);
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 70, height: 70,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF6C56F0)]),
+          ),
+          child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 36),
+        ),
+        const SizedBox(height: 16),
+        const Text('Thank You!',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        const Text('Your review has been submitted successfully.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.5)),
+        const SizedBox(height: 20),
+        GestureDetector(
+          onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF6C56F0)]),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(child: Text('Back to Home',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+          ),
+        ),
+      ]),
+    ),
+  );
+}
     } catch (e) {
       setState(() => _loading = false);
       if (mounted) {
