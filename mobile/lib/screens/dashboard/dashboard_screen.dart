@@ -75,8 +75,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ? FloatingActionButton(
               elevation: 4,
               backgroundColor: const Color(0xFF4365FF),
-              child: const Icon(Icons.add_a_photo_rounded,
-                  color: Colors.white, size: 26),
+              child: const Icon(
+                Icons.add_a_photo_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
               onPressed: () {
                 final state = _communityKey.currentState;
                 if (state == null || state.uid == null) return;
@@ -114,10 +117,7 @@ class _WorkerBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  const _WorkerBottomNavBar({
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const _WorkerBottomNavBar({required this.currentIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +198,6 @@ class _NavCircleButton extends StatelessWidget {
   }
 }
 
-
 // ==========================================
 // HOME TAB (replaced by WorkerHomeScreen)
 // ==========================================
@@ -233,4 +232,3 @@ class _WorkerBookingsTab extends StatelessWidget {
     );
   }
 }
-

@@ -201,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (under30Min)
       filtered = filtered.where((w) => w.travelMinutes <= 30).toList();
     if (highestRatedOnly)
-      filtered = filtered.where((w) => w.rating >= 4.8).toList();
+      filtered = filtered.where((w) => w.rating >= 4.0).toList();
     return filtered;
   }
 
@@ -496,10 +496,13 @@ class _HomeScreenState extends State<HomeScreen> {
             final offers = applyFilters(
               workersWithFavorites.where((w) => w.hasOffer).toList(),
             );
-            final highestRated = applyFilters(
-              [...workersWithFavorites]
-                ..sort((a, b) => b.rating.compareTo(a.rating)),
-            ).where((w) => w.rating >= 4.8).toList();
+            final highestRated =
+                applyFilters(
+                      [...workersWithFavorites]
+                        ..sort((a, b) => b.rating.compareTo(a.rating)),
+                    )
+                    .where((w) => w.rating > 0)
+                    .toList(); // show all rated workers, sorted by rating
             final categoryListResults = applyFilters(
               [...workersWithFavorites]
                 ..sort((a, b) => a.travelMinutes.compareTo(b.travelMinutes)),

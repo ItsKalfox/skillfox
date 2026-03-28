@@ -110,8 +110,7 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         break;
       case 'accepted':
         _rejected = false;
-        // Cat B and C have no inspection fee — skip payment step (stage 2)
-        // and go straight to "Worker on the way" (stage 3).
+        // Cat B/C skip inspection fee payment — go straight to stage 3
         _stage = _hasInspectionFee ? 2 : 3;
         if (!_hasInspectionFee) _startWorkerTracking();
         break;
@@ -263,11 +262,9 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       (_inspectionFee + _distanceFee + _serviceFee);
   String get _requestId => widget.requestId;
 
-  /// Category type — B and C do NOT have an inspection fee payment step.
   String get _categoryType {
     final stored = (_data['categoryType'] as String?)?.trim().toUpperCase();
     if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
-    const catA = {'plumber', 'electrician', 'mechanic', 'mason'};
     const catC = {
       'teacher',
       'tutor',
@@ -278,13 +275,36 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       'nurse',
       'nanny',
     };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
     final lower = (_data['category'] as String? ?? '').toLowerCase().trim();
-    if (catA.contains(lower)) return 'A';
     if (catC.contains(lower)) return 'C';
-    return 'B';
+    if (catB.contains(lower)) return 'B';
+    // Default to Cat A — inspection-based workers
+    return 'A';
   }
 
   bool get _hasInspectionFee => _categoryType == 'A';
+
+  String get _categoryTypeLabel {
+    switch (_categoryType) {
+      case 'A':
+        return 'Inspection Job';
+      case 'B':
+        return 'One-time Job';
+      case 'C':
+        return 'Subscription';
+      default:
+        return '';
+    }
+  }
 
   String _fmt(num n) {
     final s = n.toStringAsFixed(0);
@@ -468,10 +488,8 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
                 if (_stage == 4) _buildArrivedBanner(),
                 _buildSummaryCard(),
                 if (_stage >= 2 && !_rejected) _buildWorkerCard(),
-                // Only show inspection fee bill for Cat A
                 if (_stage >= 2 && !_rejected && _hasInspectionFee)
                   _buildBillCard(),
-                // Payment confirmed badge only for Cat A (inspection fee)
                 if (_stage >= 3 && _hasInspectionFee)
                   _buildPaymentConfirmedBadge(),
                 if (_stage == 4) _buildCustomerTimerCard(),
@@ -526,6 +544,31 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           ),
         ),
         const Spacer(),
+        if (_data.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _categoryType == 'A'
+                  ? const Color(0xFFEFF6FF)
+                  : _categoryType == 'C'
+                  ? const Color(0xFFF3EEFF)
+                  : const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              _categoryTypeLabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: _categoryType == 'A'
+                    ? _C.blue
+                    : _categoryType == 'C'
+                    ? const Color(0xFF7C3AED)
+                    : const Color(0xFF059669),
+              ),
+            ),
+          ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
@@ -1093,6 +1136,15 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       rows: [
         _SumRow(label: 'Request ID', value: '#$shortId'),
         _SumRow(label: 'Category', value: category),
+        _SumRow(
+          label: 'Service Type',
+          value: _categoryTypeLabel,
+          valueColor: _categoryType == 'A'
+              ? _C.blue
+              : _categoryType == 'C'
+              ? const Color(0xFF7C3AED)
+              : const Color(0xFF059669),
+        ),
         _SumRow(label: 'Address', value: address),
         _SumRow(label: estLabel, value: estVal, valueColor: estColor),
         if (_stage >= 2)
@@ -1615,12 +1667,14 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           _SumRow(label: 'Description', value: description),
         ]),
         _detailCard('PAYMENT SUMMARY', [
-          _SumRow(
-            label: 'Inspection Fee',
-            value: 'LKR ${_fmt(_inspectionFee)}',
-          ),
-          _SumRow(label: 'Distance Fee', value: 'LKR ${_fmt(_distanceFee)}'),
-          _SumRow(label: 'Service Fee', value: 'LKR ${_fmt(_serviceFee)}'),
+          if (_hasInspectionFee) ...[
+            _SumRow(
+              label: 'Inspection Fee',
+              value: 'LKR ${_fmt(_inspectionFee)}',
+            ),
+            _SumRow(label: 'Distance Fee', value: 'LKR ${_fmt(_distanceFee)}'),
+            _SumRow(label: 'Service Fee', value: 'LKR ${_fmt(_serviceFee)}'),
+          ],
           _SumRow(
             label: 'Total Paid',
             value: 'LKR ${_fmt(_totalAmount)}',

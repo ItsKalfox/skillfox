@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../models/worker.dart';
+import 'review_screen.dart';
 
 class _C {
   static const gradA   = Color(0xFF469FEF);
@@ -52,9 +52,15 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
   late AnimationController _spinCtrl;
   late AnimationController _pulseCtrl;
   late Animation<double>   _pulseAnim;
-
+//---------------------------google map tracking
+//-----------------------------
   GoogleMapController? _mapCtrl;
   LatLng? _workerLatLng;
+//---------------------------elapsed time tracking
+//-----------------------------
+  Timer? _timer;
+  int _elapsedSeconds = 0;
+  DateTime? _arrivedAt;
 
   @override
   void initState() {
@@ -66,14 +72,15 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
   }
 
   @override
-  void dispose() {
-    _reqSub?.cancel();
-    _workerLocSub?.cancel();
-    _spinCtrl.dispose();
-    _pulseCtrl.dispose();
-    _mapCtrl?.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _reqSub?.cancel();
+  _workerLocSub?.cancel();
+  _spinCtrl.dispose();
+  _pulseCtrl.dispose();
+  _mapCtrl?.dispose();
+  _timer?.cancel();
+  super.dispose();
+}
 
   void _listenToRequest() {
     _reqSub = FirebaseFirestore.instance
@@ -91,6 +98,7 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
     });
   }
 
+  // ─── CHANGE 1: added quotation_paid and job_done cases ───
   void _applyStatus(String status) {
     switch (status) {
       case 'pending':
@@ -114,6 +122,7 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
         _rejected = false;
         _stage = 3;
         _startWorkerTracking();
+         _startCustomerTimer();
         break;
       case 'completed':
         _rejected = false;
@@ -123,10 +132,39 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
         _rejected = false;
         _stage = 4;
         break;
+      case 'quotation_paid':
+        _rejected = false;
+        _stage = 3;
+        break;
       case 'cancelled':
+        break;
+      case 'job_done':
+        _rejected = false;
+        _stage = 5;
         break;
     }
   }
+//customer Timer functions
+  void _startCustomerTimer() {
+  if (_timer != null) return;
+  final arrivedAt = _data['arrivedAt'];
+  if (arrivedAt == null) return;
+  try {
+    _arrivedAt = (arrivedAt as Timestamp).toDate();
+    _elapsedSeconds = DateTime.now().difference(_arrivedAt!).inSeconds;
+  } catch (_) { return; }
+  _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    if (mounted) setState(() => _elapsedSeconds++);
+  });
+}
+
+String get _timerDisplay {
+  final h = _elapsedSeconds ~/ 3600;
+  final m = (_elapsedSeconds % 3600) ~/ 60;
+  final s = _elapsedSeconds % 60;
+  if (h > 0) return '${h.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}';
+  return '${m.toString().padLeft(2,'0')}:${s.toString().padLeft(2,'0')}';
+}
 
   void _startWorkerTracking() {
     final workerId = _data['workerId'] as String?;
@@ -172,15 +210,18 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
   bool get _arcSpin  => (_stage == 0 || _stage == 1) && !_rejected;
   bool get _showDots => _arcSpin;
 
+  // ─── CHANGE 2: added job_done title ───
   String get _stageTitle {
     if (_rejected) return 'Request Declined';
     final status = _data['status'] as String? ?? '';
     if (status == 'arrived') return 'Worker Has Arrived!';
+    if (status == 'job_done') return 'Quotation Completed';
     if (status == 'quotation_sent') return 'Quotation Received';
     const t = ['Submitted', 'Waiting for Worker…', 'Worker Accepted!', 'Work In Progress', 'Inspection Completed'];
     return t[_stage.clamp(0, 4)];
   }
 
+  // ─── CHANGE 3: added case 5 ───
   String get _stageSub {
     if (_rejected) return 'The worker has declined this inspection request.';
     final name   = _data['workerName'] as String? ?? 'The worker';
@@ -195,44 +236,53 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
       case 4: return status == 'quotation_sent'
           ? 'The worker has sent you a quotation. Please review it below.'
           : 'The inspection has been completed. Thank you!';
+      case 5: return 'The quotation has been successfully completed. Thank you!';
       default: return '';
     }
   }
 
+  // ─── CHANGE 4: added case 5 ───
   Color get _badgeColor {
     if (_rejected) return _C.redBg;
     switch (_stage) {
       case 2: return const Color(0xFFFFF7ED);
       case 3: return const Color(0xFFEFF6FF);
       case 4: return const Color(0xFFECFDF5);
+      case 5: return const Color(0xFFECFDF5);
       default: return const Color(0xFFEEF2FF);
     }
   }
 
+  // ─── CHANGE 5: added case 5 ───
   Color get _badgeTxtColor {
     if (_rejected) return _C.red;
     switch (_stage) {
       case 2: return _C.orange;
       case 3: return _C.blue;
       case 4: return _C.green;
+      case 5: return _C.green;
       default: return _C.accent;
     }
   }
 
+  // ─── CHANGE 6: added job_done badge text ───
   String get _badgeTxt {
     if (_rejected) return '● Declined by Worker';
     final status = _data['status'] as String? ?? '';
     if (status == 'arrived') return '● Worker Arrived';
     if (status == 'quotation_sent') return '● Quotation Received';
+    if (status == 'job_done') return '● Quotation Completed';
     const l = ['● Submitted', '● Waiting', '● Accepted', '● In Progress', '● Completed'];
     return l[_stage.clamp(0, 4)];
   }
 
+  // ─── CHANGE 7: added job_done icon ───
   IconData get _blobIcon {
     if (_rejected) return Icons.close_rounded;
     final status = _data['status'] as String? ?? '';
     if (status == 'arrived') return Icons.directions_walk_rounded;
     if (status == 'quotation_sent') return Icons.receipt_long_rounded;
+    if (status == 'job_done') return Icons.celebration_rounded;
     switch (_stage) {
       case 1: return Icons.chat_bubble_outline_rounded;
       case 2: return Icons.check_circle_outline_rounded;
@@ -259,7 +309,8 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
                 _buildSummaryCard(),
                 if (_stage >= 2 && !_rejected) _buildWorkerCard(),
                 if (_stage >= 2 && !_rejected) _buildBillCard(),
-                if (_stage >= 3) _buildPaymentBadge(),
+               if (_stage >= 3) _buildPaymentBadge(),
+                if (_stage == 3 && _data['status'] == 'arrived') _buildCustomerTimerCard(),
                 if (_stage == 3) _buildMapSection(),
                 if (_stage == 4 && _data['status'] != 'quotation_sent') _buildCompletedCard(),
               ]),
@@ -269,6 +320,59 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
         ]),
       );
 
+
+//--------------------------------------------------
+// ─── CHANGE 8: added customer timer card ───
+// This card is shown when the worker has arrived and the job is in progress. It displays an elapsed time since the worker's arrival.
+Widget _buildCustomerTimerCard() => Container(
+  margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+  padding: const EdgeInsets.all(14),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(18),
+    border: Border.all(color: _C.cardBdr, width: 0.5),
+  ),
+  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(children: [
+      Container(
+        width: 28, height: 28,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [_C.orange, Color(0xFFD14A08)]),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.timer_rounded, size: 14, color: Colors.white),
+      ),
+      const SizedBox(width: 8),
+      const Text('TIME TRACKING',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _C.muted, letterSpacing: 0.5)),
+    ]),
+    const SizedBox(height: 14),
+    Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFFED7AA), width: 0.5),
+        ),
+        child: Text(
+          _timerDisplay,
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w700,
+            color: _C.orange,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
+    ),
+    const SizedBox(height: 8),
+    const Center(
+      child: Text('Worker has arrived — job in progress',
+          style: TextStyle(fontSize: 10, color: _C.muted)),
+    ),
+  ]),
+);
   Widget _buildHeader() => Container(
         color: Colors.white,
         padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 4, bottom: 12, left: 16, right: 16),
@@ -288,14 +392,14 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
             child: Stack(alignment: Alignment.center, children: [
               AnimatedBuilder(animation: _spinCtrl, builder: (_, __) => CustomPaint(
                 size: const Size(100, 100),
-                painter: _ArcPainter(progress: _arcSpin ? null : (_stage / 4.0), spinning: _arcSpin, spinValue: _spinCtrl.value, rejected: _rejected, completed: _stage == 4),
+                painter: _ArcPainter(progress: _arcSpin ? null : (_stage / 4.0), spinning: _arcSpin, spinValue: _spinCtrl.value, rejected: _rejected, completed: _stage == 4 || _stage == 5),
               )),
               AnimatedBuilder(animation: _pulseAnim, builder: (_, __) => Container(
                 width: 58, height: 58,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    colors: _rejected ? [_C.red, const Color(0xFFDC2626)] : _stage == 4 ? [_C.green, _C.greenDk] : [_C.gradA, _C.gradB]),
+                    colors: _rejected ? [_C.red, const Color(0xFFDC2626)] : (_stage == 4 || _stage == 5) ? [_C.green, _C.greenDk] : [_C.gradA, _C.gradB]),
                   boxShadow: (!_rejected && _stage < 4) ? [BoxShadow(color: _C.accent.withOpacity(0.35), blurRadius: _pulseAnim.value, spreadRadius: _pulseAnim.value * 0.3)] : [],
                 ),
                 child: Icon(_blobIcon, color: Colors.white, size: 24),
@@ -320,7 +424,7 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
 
   Widget _buildStepBar() {
     const labels  = ['Sent', 'Waiting', 'Accepted', 'Progress', 'Done'];
-    final display = _rejected ? 1 : _stage;
+    final display = _rejected ? 1 : _stage.clamp(0, 5);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(mainAxisAlignment: MainAxisAlignment.center,
@@ -430,6 +534,7 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
           estLabel = 'Work Status'; estVal = status == 'arrived' ? 'Worker Arrived' : 'In Progress';
           estColor = _C.blue; statusTxt = status == 'arrived' ? 'Arrived' : 'In Progress'; statusColor = _C.blue; break;
         case 4: estLabel = 'Work Status'; estVal = 'Completed'; estColor = _C.green; statusTxt = 'Completed'; statusColor = _C.green; break;
+        case 5: estLabel = 'Work Status'; estVal = 'Quotation Done'; estColor = _C.green; statusTxt = 'Quotation Done'; statusColor = _C.green; break;
         default: estLabel = 'Est. Response'; estVal = 'Calculating…'; estColor = _C.accent; statusTxt = 'Submitted'; statusColor = _C.accent;
       }
     }
@@ -505,22 +610,45 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
         ]),
       );
 
-  Widget _buildPaymentBadge() => Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5)),
-        child: Row(children: [
-          Container(width: 32, height: 32, decoration: BoxDecoration(color: _C.green.withOpacity(0.12), shape: BoxShape.circle),
-              child: const Icon(Icons.check_circle_rounded, size: 16, color: _C.green)),
-          const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Payment Confirmed', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.green)),
-            Text('LKR ${_fmt(_totalAmount)} paid successfully', style: const TextStyle(fontSize: 10, color: Color(0xFF166534))),
+  // ─── CHANGE 8: payment badge changes to "Quotation Completed" when job_done ───
+  Widget _buildPaymentBadge() {
+    final isJobDone = _data['status'] == 'job_done';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
+      ),
+      child: Row(children: [
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(color: _C.green.withOpacity(0.12), shape: BoxShape.circle),
+          child: Icon(
+            isJobDone ? Icons.celebration_rounded : Icons.check_circle_rounded,
+            size: 16, color: _C.green,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              isJobDone ? 'Quotation Completed' : 'Payment Confirmed',
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.green),
+            ),
+            Text(
+              isJobDone
+                  ? 'The worker has successfully completed the job.'
+                  : 'LKR ${_fmt(_totalAmount)} paid successfully',
+              style: const TextStyle(fontSize: 10, color: Color(0xFF166534)),
+            ),
           ]),
-          const Spacer(),
-          const Icon(Icons.verified_rounded, size: 18, color: _C.green),
-        ]),
-      );
+        ),
+        const Icon(Icons.verified_rounded, size: 18, color: _C.green),
+      ]),
+    );
+  }
 
   Widget _buildMapSection() {
     final custLat = (_data['latitude']  as num?)?.toDouble() ?? 6.9271;
@@ -610,6 +738,7 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
         child: _bottomContent(),
       );
 
+  // ─── CHANGE 9: added case 5 with "Review the Worker" button ───
   Widget _bottomContent() {
     if (_rejected) return _gradBtn(label: 'Go Back', colors: [_C.red, const Color(0xFFDC2626)], onTap: () => Navigator.pop(context));
     final status = _data['status'] as String? ?? '';
@@ -619,7 +748,46 @@ class _CustomerRequestScreenState extends State<CustomerRequestScreen>
           icon: status == 'arrived' ? Icons.build_rounded : Icons.info_outline_rounded,
           text: status == 'arrived' ? 'Worker is working on your inspection' : 'Waiting for worker to arrive',
           color: _C.blue, bg: const Color(0xFFEFF6FF), border: const Color(0xFFBFDBFE));
-      case 4: return _gradBtn(label: 'Back to Home', colors: [_C.green, _C.greenDk], onTap: () => Navigator.of(context).popUntil((r) => r.isFirst));
+      case 4:
+  final alreadyReviewed4 = _data['customerRating'] != null;
+  if (alreadyReviewed4) {
+    return _infoBar(
+      icon: Icons.check_circle_rounded,
+      text: 'You have already submitted a review. Thank you!',
+      color: _C.green,
+      bg: const Color(0xFFECFDF5),
+      border: const Color(0xFFBBF7D0),
+    );
+  }
+  return _gradBtn(
+    label: 'Back to Home',
+    colors: [_C.green, _C.greenDk],
+    onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+  );
+case 5:
+  final alreadyReviewed = _data['customerRating'] != null;
+  if (alreadyReviewed) {
+    return _infoBar(
+      icon: Icons.check_circle_rounded,
+      text: 'You have already submitted a review. Thank you!',
+      color: _C.green,
+      bg: const Color(0xFFECFDF5),
+      border: const Color(0xFFBBF7D0),
+    );
+  }
+  return _gradBtn(
+    label: 'Review the Worker',
+    colors: [_C.green, _C.greenDk],
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          requestId: widget.requestId,
+          requestData: _data,
+          isWorker: false,
+        ),
+      ),
+    ));
       default: return _outlineBtn(label: 'Cancel Request', onTap: _handleCancel);
     }
   }
@@ -707,6 +875,7 @@ class _TempPaymentScreenState extends State<TempPaymentScreen> {
                 const SizedBox(width: 12),
                 const Text('Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _C.txt1)),
               ])),
+
           Expanded(child: SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
             const SizedBox(height: 16),
             Container(width: 130, height: 130, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF27AE60), _C.greenDk])),
@@ -715,6 +884,7 @@ class _TempPaymentScreenState extends State<TempPaymentScreen> {
                   const Text('LKR', style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
                   Text(_fmt(widget.totalAmount), style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
                 ])),
+
             const SizedBox(height: 20),
             Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFED7AA), width: 0.5)),
                 child: const Row(children: [Icon(Icons.info_outline_rounded, size: 14, color: _C.orange), SizedBox(width: 8), Expanded(child: Text('Complete your payment via the agreed method, then press "Payment Done" to confirm.', style: TextStyle(fontSize: 10, color: _C.orange, height: 1.5)))])),
@@ -727,6 +897,7 @@ class _TempPaymentScreenState extends State<TempPaymentScreen> {
                   const Divider(height: 20, color: _C.cardBdr, thickness: 1.5),
                   Row(children: [const Expanded(child: Text('Total', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.txt1))), Text('LKR ${_fmt(widget.totalAmount)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.accent))]),
                 ])),
+
           ]))),
           Container(color: Colors.white, padding: EdgeInsets.fromLTRB(16, 14, 16, MediaQuery.of(context).padding.bottom + 20),
               child: GestureDetector(onTap: _loading ? null : _markPaymentDone, child: Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 15),
@@ -735,6 +906,7 @@ class _TempPaymentScreenState extends State<TempPaymentScreen> {
                       : const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.check_circle_rounded, size: 16, color: Colors.white), SizedBox(width: 8), Text('Payment Done', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700))]))
               ))),
         ]),
+
       );
   Widget _pRow(String label, double amount, {String? tag}) => Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
         Text(label, style: const TextStyle(fontSize: 11, color: _C.txt2)),

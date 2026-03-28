@@ -96,18 +96,99 @@ class _ReviewScreenState extends State<ReviewScreen> {
               .fold(0.0, (a, b) => a + b);
           final avgRating = totalRatings / reviewsSnap.docs.length;
 
+          final avgRatingRounded = double.parse(avgRating.toStringAsFixed(1));
+          final reviewCount = reviewsSnap.docs.length;
+
+          // Update workers collection (used by WorkerService for listings)
           await FirebaseFirestore.instance
               .collection('workers')
               .doc(workerId)
-              .update({
-                'averageRating': double.parse(avgRating.toStringAsFixed(1)),
-                'totalReviews': reviewsSnap.docs.length,
-              });
+              .set({
+                'averageRating': avgRatingRounded,
+                'totalReviews': reviewCount,
+              }, SetOptions(merge: true));
+
+          // Update users collection — matches Firestore schema
+          // (ratingAverage + ratingCount fields visible in Firestore console)
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(workerId)
+              .set({
+                'ratingAverage': avgRatingRounded,
+                'ratingCount': reviewCount,
+              }, SetOptions(merge: true));
         }
       }
 
       if (mounted) {
-        Navigator.of(context).popUntil((r) => r.isFirst);
+        setState(() => _loading = false);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF469FEF), Color(0xFF6C56F0)],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.favorite_rounded,
+                    color: Colors.white,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Thank You!',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Your review has been submitted successfully.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF888888),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF469FEF), Color(0xFF6C56F0)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Back to Home',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       }
     } catch (e) {
       setState(() => _loading = false);

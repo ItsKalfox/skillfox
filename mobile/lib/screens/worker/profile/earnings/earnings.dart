@@ -3,6 +3,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
+// ── Colour palette ──────────────────────────────────────────────────────────
+class _K {
+  static const bg = Color(0xFFF5F6FA);
+  static const navy = Color(0xFF1A1D2E);
+  static const indigo = Color(0xFF4B5FD6);
+  static const indigoLt = Color(0xFF7B8FFF);
+  static const green = Color(0xFF22C55E);
+  static const greenDk = Color(0xFF16A34A);
+  static const amber = Color(0xFFF59E0B);
+  static const muted = Color(0xFF8E95AA);
+  static const cardBg = Colors.white;
+  static const divider = Color(0xFFEEF0F6);
+}
+
 class Earnings extends StatefulWidget {
   const Earnings({super.key});
 
@@ -25,10 +39,15 @@ class _EarningsState extends State<Earnings> {
   int _completedTasks = 0;
   double _avgTaskFee = 0;
 
-  // All raw transactions from Firestore
   List<Map<String, dynamic>> _allTx = [];
-  // Latest 5 for the list
   List<Map<String, dynamic>> _recentTx = [];
+
+  static const _paidStatuses = [
+    'completed',
+    'quotation_sent',
+    'quotation_paid',
+    'job_done',
+  ];
 
   @override
   void initState() {
@@ -36,6 +55,7 @@ class _EarningsState extends State<Earnings> {
     _fetchEarnings();
   }
 
+  // ── Data ────────────────────────────────────────────────────────────────
   Future<void> _fetchEarnings() async {
     setState(() => _isLoading = true);
     try {
@@ -43,35 +63,60 @@ class _EarningsState extends State<Earnings> {
       if (uid == null) return;
 
       final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('earnings')
-          .orderBy('createdAt', descending: true)
+          .collection('requests')
+          .where('workerId', isEqualTo: uid)
+          .where('status', whereIn: _paidStatuses)
           .get();
 
       final docs = snapshot.docs;
       final now = DateTime.now();
-      double total = 0;
-      double thisMonth = 0;
+      double total = 0, thisMonth = 0;
       final List<Map<String, dynamic>> txList = [];
 
       for (final doc in docs) {
         final data = doc.data();
-        final double amount = (data['amount'] ?? 0).toDouble();
-        final Timestamp? ts = data['createdAt'];
-        final DateTime date = ts?.toDate() ?? DateTime.now();
+        final status = data['status'] as String? ?? '';
 
-        total += amount;
-        if (date.year == now.year && date.month == now.month) {
-          thisMonth += amount;
+        double amount = 0;
+        if (status == 'job_done' || status == 'quotation_paid') {
+          final labour =
+              (data['quotationLabourCost'] ?? data['labourCost'] ?? 0)
+                  .toDouble();
+          final material =
+              (data['quotationMaterialCost'] ?? data['materialCost'] ?? 0)
+                  .toDouble();
+          final quotTotal = (data['quotationTotalCost'] ?? 0).toDouble();
+          amount = quotTotal > 0 ? quotTotal : (labour + material);
+        } else {
+          amount =
+              (data['totalPaid'] ??
+                      data['totalAmount'] ??
+                      data['quotationPrice'] ??
+                      0)
+                  .toDouble();
         }
 
+        Timestamp? ts = status == 'job_done'
+            ? (data['jobDoneAt'] ?? data['completedAt'] ?? data['createdAt'])
+            : (data['completedAt'] ?? data['paidAt'] ?? data['createdAt']);
+        final DateTime date = ts?.toDate() ?? DateTime.now();
+        final String taskName = data['category'] ?? data['service'] ?? 'Task';
+
+        total += amount;
+        if (date.year == now.year && date.month == now.month)
+          thisMonth += amount;
+
         txList.add({
-          'taskName': data['taskName'] ?? 'Task',
+          'taskName': taskName,
           'amount': amount,
           'date': date,
+          'status': status,
         });
       }
+
+      txList.sort(
+        (a, b) => (b['date'] as DateTime).compareTo(a['date'] as DateTime),
+      );
 
       _totalEarnings = total;
       _thisMonth = thisMonth;
@@ -88,66 +133,25 @@ class _EarningsState extends State<Earnings> {
     }
   }
 
-  void _buildChart() {
-    if (_selectedTab == 'Daily') {
-      _buildDailyChart();
-    } else {
-      _buildMonthlyChart();
-    }
-  }
+  void _buildChart() =>
+      _selectedTab == 'Daily' ? _buildDailyChart() : _buildMonthlyChart();
 
   void _buildDailyChart() {
     final now = DateTime.now();
-    final List<String> labels = [];
-    final List<double> values = List.filled(7, 0);
+    final values = List.filled(7, 0.0);
     const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
     for (final tx in _allTx) {
-      final date = tx['date'] as DateTime;
-      final diff = now.difference(date).inDays;
-      if (diff >= 0 && diff < 7) {
-        values[6 - diff] += tx['amount'] as double;
-      }
+      final diff = now.difference(tx['date'] as DateTime).inDays;
+      if (diff >= 0 && diff < 7) values[6 - diff] += tx['amount'] as double;
     }
-
-    labels.clear();
-    for (int i = 6; i >= 0; i--) {
-      final day = now.subtract(Duration(days: i));
-      labels.add(dayNames[day.weekday - 1]);
-    }
-
+    final labels = List.generate(
+      7,
+      (i) => dayNames[now.subtract(Duration(days: 6 - i)).weekday - 1],
+    );
     final maxVal = values.reduce((a, b) => a > b ? a : b);
-    final List<BarChartGroupData> groups = [];
-
-    for (int i = 0; i < 7; i++) {
-      final isLast = i == 6;
-      groups.add(
-        BarChartGroupData(
-          x: i,
-          barRods: [
-            BarChartRodData(
-              toY: values[i],
-              gradient: LinearGradient(
-                colors: isLast
-                    ? [const Color(0xFF4A2D8F), const Color(0xFF7C4DCC)]
-                    : [const Color(0xFF7C4DCC), const Color(0xFFB48FFF)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              width: 28,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(8),
-                bottom: Radius.circular(4),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    _barGroups = groups;
+    _barGroups = _buildBars(values);
     _barLabels = labels;
-    _maxY = maxVal == 0 ? 10000 : maxVal * 1.35;
+    _maxY = maxVal == 0 ? 10000 : maxVal * 1.4;
   }
 
   void _buildMonthlyChart() {
@@ -166,384 +170,313 @@ class _EarningsState extends State<Earnings> {
       'Nov',
       'Dec',
     ];
-
-    final List<double> values = List.filled(6, 0);
-    final List<String> labels = [];
-
-    // Build month labels for last 6 months
-    for (int i = 5; i >= 0; i--) {
-      final dt = DateTime(now.year, now.month - i, 1);
-      labels.add(monthNames[dt.month - 1]);
-    }
-
+    final values = List.filled(6, 0.0);
+    final labels = List.generate(
+      6,
+      (i) => monthNames[DateTime(now.year, now.month - (5 - i)).month - 1],
+    );
     for (final tx in _allTx) {
       final date = tx['date'] as DateTime;
-      final monthDiff = (now.year - date.year) * 12 + (now.month - date.month);
-      if (monthDiff >= 0 && monthDiff < 6) {
-        values[5 - monthDiff] += tx['amount'] as double;
-      }
+      final diff = (now.year - date.year) * 12 + (now.month - date.month);
+      if (diff >= 0 && diff < 6) values[5 - diff] += tx['amount'] as double;
     }
-
     final maxVal = values.reduce((a, b) => a > b ? a : b);
-    final List<BarChartGroupData> groups = [];
-
-    for (int i = 0; i < 6; i++) {
-      final isLast = i == 5;
-      groups.add(
-        BarChartGroupData(
-          x: i,
-          barRods: [
-            BarChartRodData(
-              toY: values[i],
-              gradient: LinearGradient(
-                colors: isLast
-                    ? [const Color(0xFF4A2D8F), const Color(0xFF7C4DCC)]
-                    : [const Color(0xFF7C4DCC), const Color(0xFFB48FFF)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              width: 28,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(8),
-                bottom: Radius.circular(4),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    _barGroups = groups;
+    _barGroups = _buildBars(values);
     _barLabels = labels;
-    _maxY = maxVal == 0 ? 50000 : maxVal * 1.35;
+    _maxY = maxVal == 0 ? 50000 : maxVal * 1.4;
   }
 
-  String _formatRs(double val) {
-    if (val >= 1000) {
-      return 'Rs ${(val / 1000).toStringAsFixed(val % 1000 == 0 ? 0 : 1)}K';
-    }
+  List<BarChartGroupData> _buildBars(List<double> values) {
+    return List.generate(values.length, (i) {
+      final isLast = i == values.length - 1;
+      return BarChartGroupData(
+        x: i,
+        barRods: [
+          BarChartRodData(
+            toY: values[i],
+            gradient: LinearGradient(
+              colors: isLast
+                  ? [_K.indigo, _K.indigoLt]
+                  : [_K.indigo.withOpacity(0.35), _K.indigoLt.withOpacity(0.5)],
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+            ),
+            width: 22,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+          ),
+        ],
+      );
+    });
+  }
+
+  String _fmt(double val) {
+    if (val >= 1000) return 'Rs ${(val / 1000).toStringAsFixed(1)}K';
     return 'Rs ${val.toStringAsFixed(0)}';
   }
 
-  String _monthName(int month) {
-    const names = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return names[month - 1];
+  String _monthName(int m) => [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ][m - 1];
+
+  String _statusLabel(String s) {
+    switch (s) {
+      case 'job_done':
+        return 'Job Done';
+      case 'quotation_paid':
+        return 'Quotation Paid';
+      case 'completed':
+        return 'Inspection Done';
+      default:
+        return 'Completed';
+    }
   }
 
+  // ── Build ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF7C4DCC)),
-              )
-            : RefreshIndicator(
-                color: const Color(0xFF7C4DCC),
-                onRefresh: _fetchEarnings,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ── Title ──
-                        const Text(
-                          'Earnings',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF222222),
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-
-                        // ── Profile Card ──
-                        _buildProfileCard(),
-                        const SizedBox(height: 16),
-
-                        // ── Stats Grid ──
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _StatCard(
-                                label: 'This Month',
-                                value: 'Rs ${_thisMonth.toStringAsFixed(0)}',
-                                badge: '▲ This Month',
-                                badgeColor: const Color(0xFF1A8A44),
-                                badgeBg: const Color(0xFFD4F7E1),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatCard(
-                                label: 'Total Earnings',
-                                value:
-                                    'Rs ${_totalEarnings.toStringAsFixed(0)}',
-                                sub: 'Since joining',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _TaskCard(
-                                count: _completedTasks.toString(),
-                                progress: (_completedTasks % 25) / 25,
-                                sub: '${_completedTasks % 25}/25 monthly goal',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _StatCard(
-                                label: 'Avg Task Fee',
-                                value: 'Rs ${_avgTaskFee.toStringAsFixed(0)}',
-                                sub: 'Per task',
-                                subColor: const Color(0xFF7C4DCC),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Breakdown Title ──
-                        const Text(
-                          'Earnings Breakdown',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2D1B5E),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // ── Tab Toggle ──
-                        _buildTabToggle(),
-                        const SizedBox(height: 12),
-
-                        // ── Chart Card ──
-                        _buildChartCard(),
-                        const SizedBox(height: 20),
-
-                        // ── Recent Transactions ──
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: const [
-                            Text(
-                              'Recent Transactions',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF2D1B5E),
-                              ),
-                            ),
-                            Text(
-                              'View all →',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF7C4DCC),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        if (_recentTx.isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
-                              child: Text(
-                                'No transactions yet',
-                                style: TextStyle(
-                                  color: Color(0xFF9080B8),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          ..._recentTx.map((tx) => _buildTransactionItem(tx)),
-                      ],
+      backgroundColor: _K.bg,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _K.indigo))
+          : RefreshIndicator(
+              color: _K.indigo,
+              onRefresh: _fetchEarnings,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  _buildHeroHeader(),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+                          _buildStatsRow(),
+                          const SizedBox(height: 20),
+                          _buildBreakdownCard(),
+                          const SizedBox(height: 20),
+                          _buildTransactionsSection(),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-      ),
+            ),
     );
   }
 
-  // ── Profile Card ──
-  Widget _buildProfileCard() {
-    final name = _user?.displayName ?? 'User';
+  // ── Hero header with gradient + summary ─────────────────────────────────
+  Widget _buildHeroHeader() {
+    final name = _user?.displayName ?? 'Worker';
     final photoUrl = _user?.photoURL;
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : 'W';
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEDE5FF)),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: const Color(0xFFC4A0FF),
-            backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-            child: photoUrl == null
-                ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  )
-                : null,
+    return SliverToBoxAdapter(
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF3B4FCA), Color(0xFF5B6FE8), Color(0xFF7B8FFF)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // ── App bar row ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Row(
                   children: [
-                    Flexible(
-                      child: Text(
-                        name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2D1B5E),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 15,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 14),
+                    const Text(
+                      'Earnings',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: Colors.white.withOpacity(0.2),
+                      backgroundImage: photoUrl != null
+                          ? NetworkImage(photoUrl)
+                          : null,
+                      child: photoUrl == null
+                          ? Text(
+                              initials,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // ── Total earnings big number ──
+              Text(
+                'Rs ${_totalEarnings.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -1.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Total Earnings',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.7),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              // ── Two quick stats inside header ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _heroStat(
+                        'This Month',
+                        'Rs ${_thisMonth.toStringAsFixed(0)}',
+                      ),
+                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE5FF),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            size: 12,
-                            color: Color(0xFF7C4DCC),
-                          ),
-                          SizedBox(width: 3),
-                          Text(
-                            'Verified',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF7C4DCC),
-                            ),
-                          ),
-                        ],
+                      width: 1,
+                      height: 36,
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                    Expanded(
+                      child: _heroStat(
+                        'Avg per Job',
+                        'Rs ${_avgTaskFee.toStringAsFixed(0)}',
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _user?.email ?? '',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9080B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              ),
 
-  // ── Tab Toggle ──
-  Widget _buildTabToggle() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0EAFF),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: ['Daily', 'Monthly'].map((tab) {
-          final isActive = tab == _selectedTab;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                setState(() => _selectedTab = tab);
-                _buildChart();
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: isActive ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
-                  boxShadow: isActive
-                      ? [
-                          BoxShadow(
-                            color: const Color(0xFF7C4DCC).withOpacity(0.12),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Text(
-                  tab,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive
-                        ? const Color(0xFF2D1B5E)
-                        : const Color(0xFF9080B8),
-                  ),
+              const SizedBox(height: 24),
+
+              // ── Curved bottom edge ──
+              Container(
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: _K.bg,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // ── Chart Card ──
-  Widget _buildChartCard() {
-    final total = _selectedTab == 'Daily' ? _thisMonth : _totalEarnings;
-    final label = _selectedTab == 'Daily'
-        ? '7-Day Overview'
-        : '6-Month Overview';
+  Widget _heroStat(String label, String value) => Column(
+    children: [
+      Text(
+        value,
+        style: const TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+        ),
+      ),
+      const SizedBox(height: 3),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: Colors.white.withOpacity(0.65),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    ],
+  );
+
+  // ── Stats row ────────────────────────────────────────────────────────────
+  Widget _buildStatsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.check_circle_rounded,
+            iconColor: _K.green,
+            iconBg: const Color(0xFFEAFBF0),
+            label: 'Completed',
+            value: _completedTasks.toString(),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.trending_up_rounded,
+            iconColor: _K.amber,
+            iconBg: const Color(0xFFFEF3C7),
+            label: 'This Month',
+            value: _fmt(_thisMonth),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _MiniStat(
+            icon: Icons.receipt_long_rounded,
+            iconColor: _K.indigo,
+            iconBg: const Color(0xFFEEF0FF),
+            label: 'Avg Fee',
+            value: _fmt(_avgTaskFee),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Breakdown card (tab toggle + chart) ─────────────────────────────────
+  Widget _buildBreakdownCard() {
     final highest = _barGroups.isNotEmpty
         ? _barGroups
               .map((g) => g.barRods.first.toY)
@@ -551,186 +484,371 @@ class _EarningsState extends State<Earnings> {
         : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFEDE5FF)),
+        color: _K.cardBg,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9080B8),
-                      fontWeight: FontWeight.w500,
+          // ── Card header ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Row(
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Breakdown',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _K.navy,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Rs ${total.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF2D1B5E),
+                    const SizedBox(height: 2),
+                    Text(
+                      _selectedTab == 'Daily' ? 'Last 7 days' : 'Last 6 months',
+                      style: const TextStyle(fontSize: 11, color: _K.muted),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                if (highest > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEEF0FF),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.arrow_upward_rounded,
+                          size: 11,
+                          color: _K.indigo,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          'Peak ${_fmt(highest)}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: _K.indigo,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    'Highest',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9080B8)),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatRs(highest),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF7C4DCC),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
+
+          const SizedBox(height: 16),
+
+          // ── Tab toggle ──
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: _K.bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: ['Daily', 'Monthly'].map((tab) {
+                  final active = tab == _selectedTab;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedTab = tab);
+                        _buildChart();
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: active ? Colors.white : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: active
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.06),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : [],
+                        ),
+                        child: Text(
+                          tab,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: active
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: active ? _K.navy : _K.muted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
           const SizedBox(height: 20),
+
+          // ── Chart ──
           SizedBox(
             height: 180,
-            child: _barGroups.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No data available',
-                      style: TextStyle(color: Color(0xFF9080B8)),
-                    ),
-                  )
-                : BarChart(
-                    BarChartData(
-                      maxY: _maxY,
-                      minY: 0,
-                      barGroups: _barGroups,
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (_) => const FlLine(
-                          color: Color(0xFFEDE5FF),
-                          strokeWidth: 1,
-                          dashArray: [4, 4],
-                        ),
-                      ),
-                      borderData: FlBorderData(show: false),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 44,
-                            getTitlesWidget: (value, meta) {
-                              if (value == 0 || value == _maxY) {
-                                return const SizedBox();
-                              }
-                              return Text(
-                                _formatRs(value),
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: Color(0xFF9080B8),
-                                ),
-                              );
-                            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: _barGroups.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.bar_chart_rounded,
+                            size: 40,
+                            color: _K.muted.withOpacity(0.3),
                           ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'No data yet',
+                            style: TextStyle(color: _K.muted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    )
+                  : BarChart(
+                      BarChartData(
+                        maxY: _maxY,
+                        minY: 0,
+                        barGroups: _barGroups,
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (_) =>
+                              FlLine(color: _K.divider, strokeWidth: 1),
                         ),
-                        rightTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        topTitles: const AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (value, meta) {
-                              final idx = value.toInt();
-                              if (idx < 0 || idx >= _barLabels.length) {
-                                return const SizedBox();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6),
-                                child: Text(
-                                  _barLabels[idx],
+                        borderData: FlBorderData(show: false),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 46,
+                              getTitlesWidget: (v, _) {
+                                if (v == 0 || v == _maxY)
+                                  return const SizedBox();
+                                return Text(
+                                  _fmt(v),
                                   style: const TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF9080B8),
-                                    fontWeight: FontWeight.w500,
+                                    fontSize: 9,
+                                    color: _K.muted,
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              },
+                            ),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (v, _) {
+                                final idx = v.toInt();
+                                if (idx < 0 || idx >= _barLabels.length)
+                                  return const SizedBox();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 6),
+                                  child: Text(
+                                    _barLabels[idx],
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: _K.muted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(
-                          getTooltipColor: (_) => const Color(0xFF2D1B5E),
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            return BarTooltipItem(
-                              'Rs ${rod.toY.toStringAsFixed(0)}',
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            getTooltipColor: (_) => _K.navy,
+                            getTooltipItem: (_, __, rod, ___) => BarTooltipItem(
+                              _fmt(rod.toY),
                               const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 12,
                               ),
-                            );
-                          },
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+            ),
           ),
+
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  // ── Transaction Item ──
+  // ── Transactions section ─────────────────────────────────────────────────
+  Widget _buildTransactionsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Recent Transactions',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _K.navy,
+              ),
+            ),
+            Text(
+              '${_recentTx.length} of ${_allTx.length}',
+              style: const TextStyle(fontSize: 12, color: _K.muted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (_recentTx.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            decoration: BoxDecoration(
+              color: _K.cardBg,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 16,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 44,
+                  color: _K.muted.withOpacity(0.35),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'No transactions yet',
+                  style: TextStyle(color: _K.muted, fontSize: 13),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              color: _K.cardBg,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: List.generate(_recentTx.length, (i) {
+                final tx = _recentTx[i];
+                final isLast = i == _recentTx.length - 1;
+                return Column(
+                  children: [
+                    _buildTransactionItem(tx),
+                    if (!isLast)
+                      const Divider(
+                        height: 1,
+                        indent: 68,
+                        endIndent: 20,
+                        color: _K.divider,
+                      ),
+                  ],
+                );
+              }),
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildTransactionItem(Map<String, dynamic> tx) {
     final date = tx['date'] as DateTime;
     final amount = tx['amount'] as double;
     final taskName = tx['taskName'] as String;
-    final dateStr =
-        '${date.day} ${_monthName(date.month)}, ${date.year} · Completed';
+    final status = tx['status'] as String;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFEDE5FF)),
-      ),
+    final Color iconBg;
+    final Color iconColor;
+    final IconData iconData;
+
+    switch (status) {
+      case 'job_done':
+        iconBg = const Color(0xFFEAFBF0);
+        iconColor = _K.green;
+        iconData = Icons.handyman_rounded;
+        break;
+      case 'quotation_paid':
+        iconBg = const Color(0xFFEEF0FF);
+        iconColor = _K.indigo;
+        iconData = Icons.receipt_rounded;
+        break;
+      default:
+        iconBg = const Color(0xFFFEF3C7);
+        iconColor = _K.amber;
+        iconData = Icons.search_rounded;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFFD4F7E1),
-              borderRadius: BorderRadius.circular(12),
+              color: iconBg,
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: const Center(
-              child: Text('🌾', style: TextStyle(fontSize: 20)),
-            ),
+            child: Icon(iconData, color: iconColor, size: 20),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -741,26 +859,24 @@ class _EarningsState extends State<Earnings> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2D1B5E),
+                    color: _K.navy,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  dateStr,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: Color(0xFF9080B8),
-                  ),
+                  '${date.day} ${_monthName(date.month)} ${date.year}  ·  ${_statusLabel(status)}',
+                  style: const TextStyle(fontSize: 11.5, color: _K.muted),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Text(
             '+Rs ${amount.toStringAsFixed(0)}',
             style: const TextStyle(
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF3ECF6A),
+              color: _K.green,
             ),
           ),
         ],
@@ -769,162 +885,67 @@ class _EarningsState extends State<Earnings> {
   }
 }
 
-// ─────────────────────────────────────────
-// Stat Card
-// ─────────────────────────────────────────
-class _StatCard extends StatelessWidget {
+// ── Mini stat card ──────────────────────────────────────────────────────────
+class _MiniStat extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
   final String label;
   final String value;
-  final String? sub;
-  final Color? subColor;
-  final String? badge;
-  final Color? badgeColor;
-  final Color? badgeBg;
 
-  const _StatCard({
+  const _MiniStat({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
     required this.label,
     required this.value,
-    this.sub,
-    this.subColor,
-    this.badge,
-    this.badgeColor,
-    this.badgeBg,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEDE5FF)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF9080B8),
-              fontWeight: FontWeight.w500,
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(icon, color: iconColor, size: 17),
           ),
-          const SizedBox(height: 6),
-          if (sub != null && subColor != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                sub!,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: subColor,
-                ),
-              ),
-            ),
+          const SizedBox(height: 10),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF2D1B5E),
-              letterSpacing: -0.5,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: _K.navy,
+              letterSpacing: -0.4,
             ),
           ),
-          if (sub != null && subColor == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                sub!,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF9080B8)),
-              ),
-            ),
-          if (badge != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeBg,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  badge!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────
-// Task Card
-// ─────────────────────────────────────────
-class _TaskCard extends StatelessWidget {
-  final String count;
-  final double progress;
-  final String sub;
-
-  const _TaskCard({
-    required this.count,
-    required this.progress,
-    required this.sub,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F5FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEDE5FF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Completed Tasks',
-            style: TextStyle(
-              fontSize: 12,
-              color: Color(0xFF9080B8),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: _K.muted,
               fontWeight: FontWeight.w500,
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            count,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF2D1B5E),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              minHeight: 6,
-              backgroundColor: const Color(0xFFEDE5FF),
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFF3ECF6A),
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            sub,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF9080B8)),
           ),
         ],
       ),

@@ -173,7 +173,6 @@ class _CustomerBookingHistoryScreenState
   String _categoryType(Map<String, dynamic> d) {
     final stored = (d['categoryType'] as String?)?.trim().toUpperCase();
     if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
-    const catA = {'plumber', 'electrician', 'mechanic', 'mason'};
     const catC = {
       'teacher',
       'tutor',
@@ -184,10 +183,19 @@ class _CustomerBookingHistoryScreenState
       'nurse',
       'nanny',
     };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
     final lower = (d['category'] as String? ?? '').toLowerCase().trim();
-    if (catA.contains(lower)) return 'A';
     if (catC.contains(lower)) return 'C';
-    return 'B';
+    if (catB.contains(lower)) return 'B';
+    return 'A';
   }
 
   // ── filtered list ─────────────────────────────────────────────────

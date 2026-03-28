@@ -14,18 +14,13 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
   const WorkerRequestDetailScreen({super.key, required this.data});
 
-  String initials(String name) {
-    final p = name.split(' ');
-    return p.length > 1 ? '${p[0][0]}${p[1][0]}' : p[0][0];
-  }
-
-  /// Derive category type from the categoryType field, falling back
-  /// to the job name when the field is absent (same logic as worker_profile_screen).
   String _categoryType() {
+    // Always trust the stored categoryType field first
     final stored = (data['categoryType'] as String?)?.trim().toUpperCase();
     if (stored == 'A' || stored == 'B' || stored == 'C') return stored!;
 
-    const catA = {'plumber', 'electrician', 'mechanic', 'mason'};
+    // Fall back to category name detection
+    // Cat C is distinctive (subscription/care workers)
     const catC = {
       'teacher',
       'tutor',
@@ -36,10 +31,27 @@ class WorkerRequestDetailScreen extends StatelessWidget {
       'nurse',
       'nanny',
     };
+    // Cat B is distinctive (fixed-price service workers)
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
     final lower = (data['category'] as String? ?? '').toLowerCase().trim();
-    if (catA.contains(lower)) return 'A';
     if (catC.contains(lower)) return 'C';
-    return 'B';
+    if (catB.contains(lower)) return 'B';
+    // Default to Cat A — inspection-based workers
+    // This is the safe fallback so existing Cat A requests never break
+    return 'A';
+  }
+
+  String initials(String name) {
+    final p = name.split(' ');
+    return p.length > 1 ? '${p[0][0]}${p[1][0]}' : p[0][0];
   }
 
   @override
@@ -51,7 +63,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
     final requestId = data['id'] ?? '';
     final status = data['status'] ?? 'pending';
     final timestamp = data['createdAt'];
-    final catType = _categoryType();
 
     final double lat = (data['latitude'] as num?)?.toDouble() ?? 0.0;
     final double lng = (data['longitude'] as num?)?.toDouble() ?? 0.0;
@@ -78,11 +89,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
     final isActiveJob =
         status != 'pending' && status != 'cancelled' && status != 'rejected';
 
-    // ── Category-specific extra info shown below description ──────────────
-    final preferredSchedule = data['preferredSchedule'] as String?;
-    final preferredCycle = data['preferredBillingCycle'] as String?;
-    final customerNotes = data['customerNotes'] as String?;
-
     return Scaffold(
       body: Stack(
         children: [
@@ -101,7 +107,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
           SafeArea(
             child: Column(
               children: [
-                // ── App bar
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Row(
@@ -122,9 +127,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const Spacer(),
-                      // Category badge
-                      _categoryBadge(catType),
                     ],
                   ),
                 ),
@@ -141,7 +143,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
-                          // ── Customer info card
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
@@ -196,7 +197,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
                           const SizedBox(height: 12),
 
-                          // ── Map
                           if (hasLocation) ...[
                             SizedBox(
                               height: 200,
@@ -248,30 +248,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                           _sectionCard('Description', desc),
                           const SizedBox(height: 12),
 
-                          // ── Category B/C extra fields
-                          if (preferredSchedule != null &&
-                              preferredSchedule.isNotEmpty) ...[
-                            _sectionCard(
-                              'Preferred Schedule',
-                              preferredSchedule,
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          if (preferredCycle != null &&
-                              preferredCycle.isNotEmpty) ...[
-                            _sectionCard(
-                              'Preferred Billing',
-                              preferredCycle.toUpperCase(),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          if (customerNotes != null &&
-                              customerNotes.isNotEmpty) ...[
-                            _sectionCard('Customer Notes', customerNotes),
-                            const SizedBox(height: 12),
-                          ],
-
-                          // ── Inspection photos (Cat A)
                           if (images.isNotEmpty)
                             Container(
                               width: double.infinity,
@@ -330,7 +306,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                   ),
                 ),
 
-                // ── Bottom action bar
                 Container(
                   padding: const EdgeInsets.all(16),
                   color: Colors.white,
@@ -339,7 +314,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          // Reject (pending only)
                           if (status == 'pending')
                             Expanded(
                               child: ElevatedButton(
@@ -366,7 +340,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                               ),
                             ),
 
-                          // Cancel within 10 min of acceptance
                           if (status == 'accepted' && canCancel)
                             Expanded(
                               child: ElevatedButton(
@@ -395,7 +368,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
 
                           if (status == 'pending') const SizedBox(width: 10),
 
-                          // Accept (pending only)
                           if (status == 'pending')
                             Expanded(
                               child: ElevatedButton(
@@ -421,126 +393,85 @@ class WorkerRequestDetailScreen extends StatelessWidget {
                               ),
                             ),
 
-                          // ── Active job buttons — routed by category type ──────────
-                          if (isActiveJob) ...[
-                            if (catType == 'B') ...[
-                              // Cat B: if no quotation sent yet → "Send Price"
-                              // else → "View Progress"
-                              if (data['quotationSent'] != true)
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => Navigator.push(
+                          if (isActiveJob)
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  final catType = _categoryType();
+                                  if (catType == 'B') {
+                                    // pending quotation → send quotation; accepted/paid → job screen
+                                    if (status == 'pending' ||
+                                        status == 'accepted') {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryBWorkerQuotationScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryBWorkerJobScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  } else if (catType == 'C') {
+                                    if (status == 'pending' ||
+                                        status == 'accepted' ||
+                                        status == 'quotation_sent') {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryCWorkerSubscriptionScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    } else {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              CategoryCWorkerSubscriptionMgmtScreen(
+                                                requestId: requestId,
+                                                requestData: data,
+                                              ),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    // Cat A — existing flow
+                                    Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            CategoryBWorkerQuotationScreen(
-                                              requestId: requestId,
-                                              requestData: data,
-                                            ),
+                                        builder: (_) => WorkerJobProgressScreen(
+                                          requestId: requestId,
+                                          requestData: data,
+                                        ),
                                       ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF10B981),
-                                    ),
-                                    child: const Text(
-                                      'Send Price',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                )
-                              else
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            CategoryBWorkerJobScreen(
-                                              requestId: requestId,
-                                              requestData: data,
-                                            ),
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF10B981),
-                                    ),
-                                    child: const Text(
-                                      'View Progress',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF4A98EF),
                                 ),
-                            ] else if (catType == 'C') ...[
-                              // Cat C: if no subscription proposal sent → "Send Proposal"
-                              // else → "Manage Subscription"
-                              if (data['quotationSent'] != true)
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            CategoryCWorkerSubscriptionScreen(
-                                              requestId: requestId,
-                                              requestData: data,
-                                            ),
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF8B5CF6),
-                                    ),
-                                    child: const Text(
-                                      'Send Proposal',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                )
-                              else
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) =>
-                                            CategoryCWorkerSubscriptionMgmtScreen(
-                                              requestId: requestId,
-                                              requestData: data,
-                                            ),
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF8B5CF6),
-                                    ),
-                                    child: const Text(
-                                      'Manage Sub',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                ),
-                            ] else ...[
-                              // Cat A — original behaviour
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => WorkerJobProgressScreen(
-                                        requestId: requestId,
-                                        requestData: data,
-                                      ),
-                                    ),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF4A98EF),
-                                  ),
-                                  child: const Text(
-                                    'View Progress',
-                                    style: TextStyle(color: Colors.white),
-                                  ),
+                                child: const Text(
+                                  'View Progress',
+                                  style: TextStyle(color: Colors.white),
                                 ),
                               ),
-                            ],
-                          ],
+                            ),
                         ],
                       ),
                     ],
@@ -550,32 +481,6 @@ class WorkerRequestDetailScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Small category badge shown in the app bar ──────────────────────────────
-  Widget _categoryBadge(String type) {
-    final Map<String, List<dynamic>> styles = {
-      'A': [const Color(0xFFEFF6FF), const Color(0xFF2563EB), 'Inspection'],
-      'B': [const Color(0xFFECFDF5), const Color(0xFF059669), 'One-time'],
-      'C': [const Color(0xFFF3EEFF), const Color(0xFF7C3AED), 'Subscription'],
-    };
-    final s = styles[type] ?? styles['A']!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: (s[0] as Color).withOpacity(0.25),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        s[2] as String,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: Colors.white.withOpacity(0.9),
-          letterSpacing: 0.3,
-        ),
       ),
     );
   }

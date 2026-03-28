@@ -52,12 +52,13 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
 
   bool get _isAvailable => (_doc['isAvailable'] as bool?) ?? true;
   double get _rating =>
-      (_doc['ratingAverage'] as num?)?.toDouble() ??
-      (_doc['rating'] as num?)?.toDouble() ??
+      (_doc['ratingAverage'] as num?)?.toDouble() ?? // users collection field
+      (_doc['averageRating'] as num?)?.toDouble() ?? // workers collection field
+      (_doc['rating'] as num?)?.toDouble() ?? // fallback
       w.rating;
   int get _ratingCount =>
-      (_doc['totalReviews'] as num?)?.toInt() ??
-      (_doc['ratingCount'] as num?)?.toInt() ??
+      (_doc['ratingCount'] as num?)?.toInt() ?? // users collection field
+      (_doc['totalReviews'] as num?)?.toInt() ?? // workers collection field
       w.ratingCount;
 
   bool get _hasOffer => (_doc['hasOffer'] as bool?) ?? w.hasOffer;
@@ -79,7 +80,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   /// Derive the category type from the job name when the Firestore field
   /// is absent.  Extend these lists as your catalogue grows.
   static String _deriveCategoryType(String category) {
-    const catA = {'plumber', 'electrician', 'mechanic', 'mason'};
     const catC = {
       'teacher',
       'tutor',
@@ -90,10 +90,19 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       'nurse',
       'nanny',
     };
+    const catB = {
+      'cleaner',
+      'cleaning',
+      'handyman',
+      'painter',
+      'carpenter',
+      'gardener',
+      'pest control',
+    };
     final lower = category.toLowerCase().trim();
-    if (catA.contains(lower)) return 'A';
     if (catC.contains(lower)) return 'C';
-    return 'B'; // cleaning, handyman, etc.
+    if (catB.contains(lower)) return 'B';
+    return 'A'; // default — inspection-based (plumber, electrician, mechanic, mason, etc.)
   }
 
   String? _str(String key) {
@@ -1005,12 +1014,10 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         break;
 
       default:
-        // Fallback — should never reach here given _deriveCategoryType
+        // Fallback — default to Cat A inspection flow
         Navigator.push(
           ctx,
-          MaterialPageRoute(
-            builder: (_) => CategoryBRequestFormScreen(worker: w),
-          ),
+          MaterialPageRoute(builder: (_) => InspectionFormScreen(worker: w)),
         );
     }
   }

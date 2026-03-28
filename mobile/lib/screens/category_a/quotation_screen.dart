@@ -1,51 +1,60 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 
 class _C {
   static const gradA = Color(0xFF469FEF);
   static const gradB = Color(0xFF6C56F0);
-  static const accent = Color(0xFF6C56F0);
   static const bg = Color(0xFFF4F6FA);
   static const cardBdr = Color(0xFFE2E6F0);
   static const txt1 = Color(0xFF111111);
   static const txt2 = Color(0xFF888888);
   static const muted = Color(0xFFA0A4B0);
   static const green = Color(0xFF16A34A);
-  static const greenDk = Color(0xFF1E8449);
   static const red = Color(0xFFEF4444);
   static const orange = Color(0xFFEA580C);
 }
 
-class QuotationPaymentScreen extends StatefulWidget {
+class QuotationScreen extends StatefulWidget {
   final String requestId;
   final Map<String, dynamic> requestData;
 
-  const QuotationPaymentScreen({
+  const QuotationScreen({
     super.key,
     required this.requestId,
     required this.requestData,
   });
 
   @override
-  State<QuotationPaymentScreen> createState() => _QuotationPaymentScreenState();
+  State<QuotationScreen> createState() => _QuotationScreenState();
 }
 
-class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
-  bool _loading = false;
-  bool _paid = false;
+class _QuotationScreenState extends State<QuotationScreen> {
+  final _jobDescCtrl = TextEditingController();
+  final _labourCostCtrl = TextEditingController();
+  final _materialCostCtrl = TextEditingController();
+  final _completionTimeCtrl = TextEditingController();
+  final _notesCtrl = TextEditingController();
 
-  double get _labourCost =>
-      (widget.requestData['quotationLabourCost'] as num?)?.toDouble() ?? 0;
-  double get _materialCost =>
-      (widget.requestData['quotationMaterialCost'] as num?)?.toDouble() ?? 0;
-  double get _totalCost =>
-      (widget.requestData['quotationTotalCost'] as num?)?.toDouble() ??
-      (_labourCost + _materialCost);
-  String get _workerName =>
-      widget.requestData['workerName'] as String? ?? 'Worker';
-  String get _category => widget.requestData['category'] as String? ?? '';
-  String get _jobDesc =>
-      widget.requestData['quotationJobDesc'] as String? ?? '';
+  File? _evidencePhoto;
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _jobDescCtrl.dispose();
+    _labourCostCtrl.dispose();
+    _materialCostCtrl.dispose();
+    _completionTimeCtrl.dispose();
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  double get _totalCost {
+    final labour = double.tryParse(_labourCostCtrl.text.trim()) ?? 0;
+    final material = double.tryParse(_materialCostCtrl.text.trim()) ?? 0;
+    return labour + material;
+  }
 
   String _fmt(num n) {
     final s = n.toStringAsFixed(0);
@@ -57,58 +66,72 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
     return b.toString();
   }
 
-  Future<void> _confirmPayment() async {
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (picked != null) setState(() => _evidencePhoto = File(picked.path));
+  }
+
+  Future<void> _sendQuotation() async {
+    if (_jobDescCtrl.text.trim().isEmpty) {
+      _showSnack('Please enter job description.', isError: true);
+      return;
+    }
+    if (_labourCostCtrl.text.trim().isEmpty) {
+      _showSnack('Please enter labour cost.', isError: true);
+      return;
+    }
+
+    final labour = double.tryParse(_labourCostCtrl.text.trim()) ?? 0;
+    final material = double.tryParse(_materialCostCtrl.text.trim()) ?? 0;
+    if (labour <= 0) {
+      _showSnack('Please enter a valid labour cost.', isError: true);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
-      final amount = _totalCost;
-      final commission = (amount * 0.10).roundToDouble();
-      final netAmount = amount - commission;
-
-      // Write to payments collection
-      await FirebaseFirestore.instance.collection('payments').add({
-        'requestId': widget.requestId,
-        'amount': amount,
-        'commission': commission,
-        'netAmount': netAmount,
-        'status': 'completed',
-        'service': _category,
-        'workerId': widget.requestData['workerId'] ?? '',
-        'workerName': _workerName,
-        'customerId': widget.requestData['customerId'] ?? '',
-        'customerName': widget.requestData['customerName'] ?? '',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
       await FirebaseFirestore.instance
           .collection('requests')
           .doc(widget.requestId)
           .update({
-            'quotationPaymentStatus': 'paid',
-            'quotationPaidAt': FieldValue.serverTimestamp(),
-            'quotationTotalPaid': _totalCost,
-            'status': 'quotation_paid',
+            'quotationJobDesc': _jobDescCtrl.text.trim(),
+            'quotationLabourCost': labour,
+            'quotationMaterialCost': material,
+            'quotationTotalCost': labour + material,
+            'quotationCompletionTime': _completionTimeCtrl.text.trim(),
+            'quotationNotes': _notesCtrl.text.trim(),
+            'categoryType': 'A',
+            'quotationSent': true,
+            'quotationStatus': 'pending',
+            'status': 'quotation_sent',
+            'quotationSentAt': FieldValue.serverTimestamp(),
           });
-      if (mounted)
-        setState(() {
-          _loading = false;
-          _paid = true;
-        });
-    } catch (e) {
+
       if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: _C.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        _showSnack('Quotation sent to customer!');
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) Navigator.pop(context);
       }
+    } catch (e) {
+      if (mounted) _showSnack('Error: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? _C.red : _C.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -146,12 +169,46 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Quotation Payment',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Send Quotation',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'for ${widget.requestData['customerName'] ?? 'Customer'} · ${widget.requestData['category'] ?? ''}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'CAT A',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ],
@@ -161,7 +218,247 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: _paid ? _buildPaidState() : _buildPaymentState(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Customer's original request description as context for the worker
+                  if ((widget.requestData['description'] as String? ?? '')
+                      .isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _C.cardBdr, width: 0.5),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline_rounded,
+                                size: 13,
+                                color: _C.gradB,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'CUSTOMER REQUEST',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: _C.muted,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.requestData['description'] as String? ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: _C.txt1,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF7ED),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFFFED7AA),
+                        width: 0.5,
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 16,
+                          color: _C.orange,
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Fill in the quotation details. This will be sent to the customer for approval before proceeding.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _C.orange,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _fieldLabel('Job Description / Work Done'),
+                  const SizedBox(height: 8),
+                  _textArea(
+                    _jobDescCtrl,
+                    'Replaced leaking pipe joint under kitchen sink.\nCleaned drainage. Checked all visible connections.',
+                    4,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _fieldLabel('Labour Cost (LKR)'),
+                  const SizedBox(height: 8),
+                  _textInput(
+                    _labourCostCtrl,
+                    '2500',
+                    TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _fieldLabel('Material Cost (LKR)'),
+                  const SizedBox(height: 8),
+                  _textInput(
+                    _materialCostCtrl,
+                    '1800',
+                    TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                  ),
+
+                  if (_totalCost > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [_C.gradA, _C.gradB],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          const Text(
+                            'Total Cost:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'LKR ${_fmt(_totalCost)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 16),
+
+                  _fieldLabel('Estimated Completion Time'),
+                  const SizedBox(height: 8),
+                  _textInput(
+                    _completionTimeCtrl,
+                    '2 hours',
+                    TextInputType.text,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _fieldLabel('Attach Photo / Evidence'),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: _pickPhoto,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: _C.cardBdr,
+                          style: BorderStyle.solid,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: _evidencePhoto != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                _evidencePhoto!,
+                                height: 120,
+                                fit: BoxFit.cover,
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                Icon(
+                                  Icons.camera_alt_outlined,
+                                  size: 32,
+                                  color: Colors.grey.shade400,
+                                ),
+                                const SizedBox(height: 8),
+                                RichText(
+                                  text: TextSpan(
+                                    children: [
+                                      const TextSpan(
+                                        text: 'Tap to upload ',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: _C.gradA,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: 'a photo of the work area',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey.shade500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'JPG, PNG up to 10MB',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey.shade400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _fieldLabel('Additional Notes'),
+                  const SizedBox(height: 8),
+                  _textArea(
+                    _notesCtrl,
+                    'Any additional notes for the customer...',
+                    3,
+                  ),
+
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
 
@@ -171,365 +468,140 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
               16,
               14,
               16,
-              MediaQuery.of(context).padding.bottom + 20,
+              MediaQuery.of(context).padding.bottom + 16,
             ),
-            child: _paid ? _buildPaidBottomBar() : _buildConfirmButton(),
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: _loading ? null : _sendQuotation,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_C.gradA, _C.gradB],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Center(
+                      child: _loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.send_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Send Quotation to Customer',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _C.cardBdr, width: 1.5),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: _C.txt2,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentState() => Column(
-    children: [
-      const SizedBox(height: 8),
-
-      Container(
-        width: 150,
-        height: 150,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_C.gradA, _C.gradB],
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'Quotation Total',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'LKR',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            Text(
-              _fmt(_totalCost),
-              style: const TextStyle(
-                fontSize: 26,
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 24),
-
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF7ED),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFFED7AA), width: 0.5),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, size: 14, color: _C.orange),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Complete payment via the agreed method, then press "Confirm Payment".',
-                style: TextStyle(fontSize: 10, color: _C.orange, height: 1.5),
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 16),
-
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _C.cardBdr, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.receipt_long_outlined, size: 14, color: _C.gradA),
-                SizedBox(width: 6),
-                Text(
-                  'QUOTATION SUMMARY',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: _C.muted,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _pRow('Worker', _workerName, isText: true),
-            _pRow('Category', _category, isText: true),
-            if (_jobDesc.isNotEmpty) _pRow('Job', _jobDesc, isText: true),
-            const Divider(height: 20, color: _C.cardBdr, thickness: 1),
-            _pRow('Labour Cost', _fmt(_labourCost)),
-            _pRow('Material Cost', _fmt(_materialCost)),
-            const Divider(height: 20, color: _C.cardBdr, thickness: 1.5),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Total',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _C.txt1,
-                    ),
-                  ),
-                ),
-                Text(
-                  'LKR ${_fmt(_totalCost)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _C.accent,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-
-  Widget _buildPaidState() => Column(
-    children: [
-      const SizedBox(height: 32),
-
-      Container(
-        width: 100,
-        height: 100,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: const LinearGradient(colors: [_C.green, _C.greenDk]),
-          boxShadow: [
-            BoxShadow(
-              color: _C.green.withOpacity(0.3),
-              blurRadius: 20,
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.check_circle_rounded,
-          color: Colors.white,
-          size: 50,
-        ),
-      ),
-
-      const SizedBox(height: 24),
-
-      const Text(
-        'Payment Confirmed!',
-        style: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: _C.green,
-        ),
-      ),
-      const SizedBox(height: 8),
-      const Text(
-        'Your payment has been confirmed.\nWaiting for the worker to mark the job as done.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, color: _C.txt2, height: 1.6),
-      ),
-
-      const SizedBox(height: 24),
-
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFBBF7D0), width: 1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.receipt_long_outlined, size: 14, color: _C.green),
-                SizedBox(width: 6),
-                Text(
-                  'PAYMENT SUMMARY',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: _C.muted,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            _pRow('Worker', _workerName, isText: true),
-            _pRow('Category', _category, isText: true),
-            const Divider(height: 20, color: _C.cardBdr),
-            _pRow('Labour Cost', _fmt(_labourCost)),
-            _pRow('Material Cost', _fmt(_materialCost)),
-            const Divider(height: 16, color: _C.cardBdr, thickness: 1.5),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Total Paid',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _C.txt1,
-                    ),
-                  ),
-                ),
-                Text(
-                  'LKR ${_fmt(_totalCost)}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: _C.green,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-
-      const SizedBox(height: 16),
-
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFECFDF5),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.hourglass_top_rounded, size: 14, color: _C.green),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'The worker will mark the job as done once everything is complete.',
-                style: TextStyle(fontSize: 11, color: _C.green, height: 1.5),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-
-  Widget _buildConfirmButton() => GestureDetector(
-    onTap: _loading ? null : _confirmPayment,
-    child: Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 15),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [_C.gradA, _C.gradB]),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Center(
-        child: _loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Confirm Payment',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-      ),
+  Widget _fieldLabel(String label) => Text(
+    label,
+    style: const TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: _C.txt1,
     ),
   );
 
-  Widget _buildPaidBottomBar() => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.symmetric(vertical: 13),
+  Widget _textInput(
+    TextEditingController ctrl,
+    String hint,
+    TextInputType type, {
+    void Function(String)? onChanged,
+  }) => Container(
     decoration: BoxDecoration(
-      color: const Color(0xFFECFDF5),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0xFFBBF7D0)),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: _C.cardBdr),
     ),
-    child: const Center(
-      child: Text(
-        '✓ Payment Confirmed — Waiting for worker',
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: _C.green,
+    child: TextField(
+      controller: ctrl,
+      keyboardType: type,
+      onChanged: onChanged,
+      style: const TextStyle(fontSize: 14, color: _C.txt1),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: _C.muted, fontSize: 14),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
         ),
       ),
     ),
   );
 
-  Widget _pRow(String label, String value, {bool isText = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 11, color: _C.txt2),
+  Widget _textArea(TextEditingController ctrl, String hint, int lines) =>
+      Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _C.cardBdr),
+        ),
+        child: TextField(
+          controller: ctrl,
+          maxLines: lines,
+          style: const TextStyle(fontSize: 13, color: _C.txt1),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: _C.muted, fontSize: 13),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.all(14),
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: isText ? FontWeight.w500 : FontWeight.w600,
-              color: _C.txt1,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+      );
 }
