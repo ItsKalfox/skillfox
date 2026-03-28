@@ -257,7 +257,7 @@ class _WorkerJobProgressScreenState extends State<WorkerJobProgressScreen>
       );
 
   Widget _buildHero() {
-    final titles = ['Waiting for Payment', 'Head to Job Location', 'Job In Progress', 'Job Completed!', 'Quotation Sent', 'Quotation Accepted!', 'Quotation Declined', 'Job Successfully Done!'];
+    final titles = ['Waiting for Payment', 'Head to Job Location', 'Job In Progress', 'Job Completed!', 'Quotation Sent', 'Quotation Accepted!', 'Quotation Declined', 'Quotation Completed'];
     final subs   = [
       'Customer needs to complete payment before you head over.',
       'Customer paid! Head to the job location and tap "Mark as Arrived".',
@@ -266,7 +266,7 @@ class _WorkerJobProgressScreenState extends State<WorkerJobProgressScreen>
       'Quotation sent. Waiting for customer to accept or decline.',
       'Customer accepted and paid the quotation. Job is done!',
       'Customer declined the quotation.',
-      'Quotation was completed successfully! Thank you.',
+      'Quotation successfully completed. Great work!',
     ];
     final icons  = [Icons.hourglass_top_rounded, Icons.directions_car_rounded, Icons.build_rounded, Icons.check_circle_rounded, Icons.receipt_long_rounded, Icons.verified_rounded, Icons.cancel_outlined, Icons.celebration_rounded];
     final cols   = [
@@ -279,7 +279,7 @@ class _WorkerJobProgressScreenState extends State<WorkerJobProgressScreen>
       [_C.red, const Color(0xFFDC2626)],
       [_C.green, _C.greenDk],
     ];
-    final idx = _stage.clamp(0, 6);
+   final idx = _stage.clamp(0, 7);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 14),
       child: Column(children: [

@@ -127,12 +127,16 @@ const _activeStatuses = [
   'accepted',
   'inprogress',
   'arrived',
-  'completed',
   'quotation_sent',
   'quotation_paid',
 ];
-const _historyStatuses = ['cancelled', 'rejected', 'quotation_declined'];
-
+const _historyStatuses = [
+  'cancelled',
+  'rejected',
+  'quotation_declined',
+  'completed',
+  'job_done',
+];
 class CustomerBookingsScreen extends StatefulWidget {
   const CustomerBookingsScreen({super.key});
 

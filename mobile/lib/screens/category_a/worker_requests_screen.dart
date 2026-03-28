@@ -15,11 +15,10 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
 
   String _selectedFilter = "All";
 
-  final List<String> _filters = [
-    "All", "pending", "accepted", "inprogress",
-    "arrived", "completed", "quotation_sent", "cancelled",
-  ];
-
+ final List<String> _filters = [
+  "All", "pending", "accepted", "inprogress",
+  "arrived", "completed", "quotation_sent", "quotation_paid", "job_done", "cancelled",
+];
   String initials(String name) {
     if (name.trim().isEmpty) return '?';
     final p = name.trim().split(" ");
@@ -138,7 +137,11 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
                         final filteredDocs = docs.where((doc) {
                           final data = doc.data() as Map<String, dynamic>;
                           if (_selectedFilter == "All") return true;
-                          return (data['status'] ?? '').toString() == _selectedFilter;
+                          final status = (data['status'] ?? '').toString();
+                            if (_selectedFilter == 'completed') {
+                              return status == 'completed' || status == 'job_done';
+                            }
+                            return status == _selectedFilter;
                         }).toList();
 
                         filteredDocs.sort((a, b) {
@@ -213,21 +216,26 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
 
                                 const SizedBox(height: 12),
 
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: GestureDetector(
-                                    onTap: () => Navigator.push(context, MaterialPageRoute(
-                                        builder: (context) => WorkerRequestDetailScreen(data: data))),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF6C56F0)]),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text("View", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                    ),
-                                  ),
-                                ),
+                                const SizedBox(height: 12),
+
+if (status == 'completed' || status == 'job_done') ...[
+  _buildReviewSummary(data),
+] else
+  Align(
+    alignment: Alignment.centerRight,
+    child: GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(
+          builder: (context) => WorkerRequestDetailScreen(data: data))),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF469FEF), Color(0xFF6C56F0)]),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Text("View", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+      ),
+    ),
+  ),
                               ]),
                             );
                           },
@@ -258,6 +266,69 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
     );
   }
 
+  Widget _buildReviewSummary(Map<String, dynamic> data) {
+  final rating     = (data['customerRating'] as num?)?.toDouble();
+  final reviewText = data['customerReview']  as String? ?? '';
+  final hasReview  = rating != null;
+
+  if (!hasReview) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: const Row(children: [
+        Icon(Icons.rate_review_outlined, size: 14, color: Colors.grey),
+        SizedBox(width: 8),
+        Text('No review yet', style: TextStyle(fontSize: 11, color: Colors.grey)),
+      ]),
+    );
+  }
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.green.shade50,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: Colors.green.shade100),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+        const SizedBox(width: 4),
+        Text(rating.toStringAsFixed(1),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFF59E0B))),
+        const SizedBox(width: 6),
+        Row(children: List.generate(5, (i) => Icon(
+          i < rating ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: 12,
+          color: const Color(0xFFF59E0B),
+        ))),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Text('Customer Review',
+              style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: Color(0xFF16A34A))),
+        ),
+      ]),
+      if (reviewText.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text(reviewText,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF444444), height: 1.4),
+            maxLines: 2, overflow: TextOverflow.ellipsis),
+      ],
+    ]),
+  );
+}
+
   String _filterLabel(String filter) {
     switch (filter) {
       case 'All':            return 'ALL';
@@ -266,7 +337,9 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
       case 'inprogress':     return 'PAID';
       case 'arrived':        return 'ARRIVED';
       case 'completed':      return 'COMPLETED';
-      case 'quotation_sent': return 'QUOTATION';
+      case 'quotation_sent':  return 'QUOTATION';
+      case 'quotation_paid':  return 'QTN PAID';
+      case 'job_done':        return 'JOB DONE';
       case 'cancelled':      return 'CANCELLED';
       case 'rejected':       return 'REJECTED';
       default:               return filter.toUpperCase();
@@ -282,6 +355,8 @@ class _WorkerRequestsScreenState extends State<WorkerRequestsScreen> {
       case 'arrived':        bg = Colors.teal.shade100;   text = Colors.teal.shade800;   break;
       case 'completed':      bg = Colors.green.shade100;  text = Colors.green.shade800;  break;
       case 'quotation_sent': bg = Colors.blue.shade100;   text = Colors.blue.shade800;   break;
+      case 'quotation_paid': bg = Colors.green.shade100;  text = Colors.green.shade800;  break;
+      case 'job_done':       bg = Colors.green.shade100;  text = Colors.green.shade800;  break;
       case 'cancelled':      bg = Colors.red.shade100;    text = Colors.red.shade800;    break;
       case 'rejected':       bg = Colors.red.shade100;    text = Colors.red.shade800;    break;
       default:               bg = Colors.grey.shade200;   text = Colors.black54;

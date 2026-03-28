@@ -146,6 +146,11 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         _rejected = false;
         _stage = 8;
         break;
+      case 'job_done':
+        _rejected = false;
+        _stage = 9;
+        _displayTimer?.cancel();
+        break;
       case 'cancelled':
         if (mounted) Navigator.pop(context);
         break;
@@ -1250,7 +1255,9 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
         ),
       );
 
-  Widget _buildPaymentConfirmedBadge() => Container(
+  Widget _buildPaymentConfirmedBadge() {
+  final isJobDone = _data['status'] == 'job_done';
+  return Container(
     margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
@@ -1258,44 +1265,32 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: const Color(0xFFBBF7D0), width: 0.5),
     ),
-    child: Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: _C.green.withOpacity(0.12),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.check_circle_rounded,
-            size: 16,
-            color: _C.green,
-          ),
+    child: Row(children: [
+      Container(
+        width: 32, height: 32,
+        decoration: BoxDecoration(color: _C.green.withOpacity(0.12), shape: BoxShape.circle),
+        child: Icon(
+          isJobDone ? Icons.celebration_rounded : Icons.check_circle_rounded,
+          size: 16, color: _C.green,
         ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Confirmed',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _C.green,
-              ),
-            ),
-            Text(
-              'LKR ${_fmt(_totalAmount)} paid successfully',
-              style: const TextStyle(fontSize: 10, color: Color(0xFF166534)),
-            ),
-          ],
-        ),
-        const Spacer(),
-        const Icon(Icons.verified_rounded, size: 18, color: _C.green),
-      ],
-    ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            isJobDone ? 'Quotation Completed' : 'Payment Confirmed',
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _C.green),
+          ),
+          Text(
+            isJobDone ? 'The worker has successfully completed the job.' : 'LKR ${_fmt(_totalAmount)} paid successfully',
+            style: const TextStyle(fontSize: 10, color: Color(0xFF166534)),
+          ),
+        ]),
+      ),
+      const Icon(Icons.verified_rounded, size: 18, color: _C.green),
+    ]),
   );
+}
 
   Widget _buildCustomerTimerCard() => Container(
     margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -1871,20 +1866,21 @@ class _WaitingWorkerScreenState extends State<WaitingWorkerScreen>
           ),
         );
       case 8:
-        return _gradBtn(
-          label: 'Leave a Review',
-          colors: [_C.gradA, _C.gradB],
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ReviewScreen(
-                requestId: _requestId,
-                requestData: _data,
-                isWorker: false,
-              ),
-            ),
-          ),
-        );
+      case 9:
+  return _gradBtn(
+    label: 'Leave a Review',
+    colors: [_C.gradA, _C.gradB],
+    onTap: () => Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReviewScreen(
+          requestId: _requestId,
+          requestData: _data,
+          isWorker: false,
+        ),
+      ),
+    ),
+  );
       default:
         return _outlineBtn(label: 'Cancel Request', onTap: _handleCancel);
     }

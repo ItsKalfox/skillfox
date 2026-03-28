@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../review_screen.dart';
 
 class _C {
   static const gradA   = Color(0xFF469FEF);
@@ -33,6 +34,7 @@ class QuotationPaymentScreen extends StatefulWidget {
 class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
   bool _loading = false;
   bool _paid    = false;
+  bool _jobDone = false; // NEW
 
   double get _labourCost   => (widget.requestData['quotationLabourCost']   as num?)?.toDouble() ?? 0;
   double get _materialCost => (widget.requestData['quotationMaterialCost'] as num?)?.toDouble() ?? 0;
@@ -40,6 +42,23 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
   String get _workerName   => widget.requestData['workerName']             as String? ?? 'Worker';
   String get _category     => widget.requestData['category']               as String? ?? '';
   String get _jobDesc      => widget.requestData['quotationJobDesc']       as String? ?? '';
+
+  // NEW: Firestore listener added
+  @override
+  void initState() {
+    super.initState();
+    FirebaseFirestore.instance
+        .collection('requests')
+        .doc(widget.requestId)
+        .snapshots()
+        .listen((snap) {
+      if (!snap.exists || !mounted) return;
+      final d = snap.data()!;
+      if (d['status'] == 'job_done' && mounted) {
+        setState(() => _jobDone = true);
+      }
+    });
+  }
 
   String _fmt(num n) {
     final s = n.toStringAsFixed(0);
@@ -108,10 +127,15 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
           ]),
         ),
 
+        // CHANGED: added _jobDone check
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: _paid ? _buildPaidState() : _buildPaymentState(),
+            child: _jobDone
+                ? _buildJobDoneState()
+                : _paid
+                    ? _buildPaidState()
+                    : _buildPaymentState(),
           ),
         ),
 
@@ -119,15 +143,20 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
           color: Colors.white,
           padding: EdgeInsets.fromLTRB(
               16, 14, 16, MediaQuery.of(context).padding.bottom + 20),
-          child: _paid ? _buildPaidBottomBar() : _buildConfirmButton(),
+          // CHANGED: added _jobDone check
+          child: _jobDone
+              ? _buildJobDoneBottomBar()
+              : _paid
+                  ? _buildPaidBottomBar()
+                  : _buildConfirmButton(),
         ),
       ]),
     );
   }
 
+  // NOT CHANGED
   Widget _buildPaymentState() => Column(children: [
         const SizedBox(height: 8),
-
         Container(
           width: 150, height: 150,
           decoration: const BoxDecoration(
@@ -147,9 +176,7 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
                 style: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
           ]),
         ),
-
         const SizedBox(height: 24),
-
         Container(
           width: double.infinity, padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -164,9 +191,7 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
                 style: TextStyle(fontSize: 10, color: _C.orange, height: 1.5))),
           ]),
         ),
-
         const SizedBox(height: 16),
-
         Container(
           width: double.infinity, padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -198,9 +223,9 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
         ),
       ]);
 
+  // NOT CHANGED
   Widget _buildPaidState() => Column(children: [
         const SizedBox(height: 32),
-
         Container(
           width: 100, height: 100,
           decoration: BoxDecoration(
@@ -212,18 +237,14 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
           ),
           child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 50),
         ),
-
         const SizedBox(height: 24),
-
         const Text('Payment Confirmed!',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _C.green)),
         const SizedBox(height: 8),
         const Text('Your payment has been confirmed.\nWaiting for the worker to mark the job as done.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: _C.txt2, height: 1.6)),
-
         const SizedBox(height: 24),
-
         Container(
           width: double.infinity, padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -252,9 +273,7 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
             ]),
           ]),
         ),
-
         const SizedBox(height: 16),
-
         Container(
           width: double.infinity, padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -271,6 +290,60 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
         ),
       ]);
 
+  // NEW: shown when worker clicks Mark as Done
+  Widget _buildJobDoneState() => Column(children: [
+        const SizedBox(height: 32),
+        Container(
+          width: 100, height: 100,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(colors: [_C.green, _C.greenDk]),
+            boxShadow: [BoxShadow(
+                color: _C.green.withOpacity(0.3),
+                blurRadius: 20, spreadRadius: 2)],
+          ),
+          child: const Icon(Icons.celebration_rounded, color: Colors.white, size: 50),
+        ),
+        const SizedBox(height: 24),
+        const Text('Quotation Completed!',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _C.green)),
+        const SizedBox(height: 8),
+        const Text('The worker has successfully completed the job.\nThank you for using our service!',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: _C.txt2, height: 1.6)),
+        const SizedBox(height: 24),
+        Container(
+          width: double.infinity, padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFBBF7D0), width: 1)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Row(children: [
+              Icon(Icons.receipt_long_outlined, size: 14, color: _C.green),
+              SizedBox(width: 6),
+              Text('PAYMENT SUMMARY',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _C.muted, letterSpacing: 0.5)),
+            ]),
+            const SizedBox(height: 14),
+            _pRow('Worker',   _workerName, isText: true),
+            _pRow('Category', _category,   isText: true),
+            const Divider(height: 20, color: _C.cardBdr),
+            _pRow('Labour Cost',   _fmt(_labourCost)),
+            _pRow('Material Cost', _fmt(_materialCost)),
+            const Divider(height: 16, color: _C.cardBdr, thickness: 1.5),
+            Row(children: [
+              const Expanded(child: Text('Total Paid',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.txt1))),
+              Text('LKR ${_fmt(_totalCost)}',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.green)),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 16),
+      ]);
+
+  // NOT CHANGED
   Widget _buildConfirmButton() => GestureDetector(
         onTap: _loading ? null : _confirmPayment,
         child: Container(
@@ -290,16 +363,48 @@ class _QuotationPaymentScreenState extends State<QuotationPaymentScreen> {
         ),
       );
 
+  // NOT CHANGED
   Widget _buildPaidBottomBar() => Container(
         width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 13),
         decoration: BoxDecoration(
             color: const Color(0xFFECFDF5),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFBBF7D0))),
-        child: const Center(child: Text('✓ Payment Confirmed — Waiting for worker',
+        child: const Center(child: Text('✓ Payment Confirmed',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.green))),
       );
 
+  // NEW: shown when worker clicks Mark as Done
+  Widget _buildJobDoneBottomBar() => GestureDetector(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReviewScreen(
+              requestId:   widget.requestId,
+              requestData: widget.requestData,
+              isWorker:    false,
+            ),
+          ),
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [_C.green, _C.greenDk]),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Center(
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.star_rounded, size: 16, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Review the Worker',
+                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+        ),
+      );
+
+  // NOT CHANGED
   Widget _pRow(String label, String value, {bool isText = false}) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
