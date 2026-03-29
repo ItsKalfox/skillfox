@@ -44,78 +44,96 @@ class _WorkerSignup1ScreenState extends State<WorkerSignup1Screen> {
                         topLeft: Radius.circular(30), topRight: Radius.circular(30),
                       ),
                     ),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-                            Text('Welcome to us,',
-                              style: GoogleFonts.poppins(
-                                fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.primary,
-                              ),
-                            ),
-                            Text('Hello there, create New Worker account',
-                              style: GoogleFonts.poppins(fontSize: 13, color: AppColors.neutral2),
-                            ),
-                            const SizedBox(height: 24),
-                            // Illustration
-                            Center(
-                              child: Stack(
-                                alignment: Alignment.center,
+                    child: Column(
+                      children: [
+                        // Scrollable content area
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.only(left: 45, right: 45, top: 28, bottom: 16),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Image.asset(
-                                    'assets/images/signup-clipart.png',
-                                    width: 220,
-                                    height: 220,
-                                    fit: BoxFit.contain,
+                                  const SizedBox(height: 8),
+                                  Text('Welcome to us,',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.primary,
+                                    ),
                                   ),
+                                  Text('Hello there, create New Worker account',
+                                    style: GoogleFonts.poppins(fontSize: 13, color: AppColors.neutral2),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  // Illustration
+                                  Center(
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/signup-clipart.png',
+                                          width: 220,
+                                          height: 220,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  AppTextField(placeholder: 'Full Name', controller: _nameCtrl,
+                                    validator: (v) => Validators.required(v, 'Full Name')),
+                                  const SizedBox(height: 22),
+                                  AppTextField(placeholder: 'Phone Number', controller: _phoneCtrl,
+                                    keyboardType: TextInputType.phone,
+                                    validator: Validators.phone),
+                                  const SizedBox(height: 22),
+                                  AppTextField(placeholder: 'National ID', controller: _idCtrl,
+                                    validator: (v) => Validators.required(v, 'National ID')),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            AppTextField(placeholder: 'Full Name', controller: _nameCtrl,
-                              validator: (v) => Validators.required(v, 'Full Name')),
-                            const SizedBox(height: 22),
-                            AppTextField(placeholder: 'Phone Number', controller: _phoneCtrl,
-                              keyboardType: TextInputType.phone,
-                              validator: Validators.phone),
-                            const SizedBox(height: 22),
-                            AppTextField(placeholder: 'National ID', controller: _idCtrl,
-                              validator: (v) => Validators.required(v, 'National ID')),
-                            const SizedBox(height: 40),
-                            // Arrow button
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: GestureDetector(
-                                onTap: () {
-                                  if (_formKey.currentState!.validate()) {
-                                    Navigator.push(context, MaterialPageRoute(
-                                      builder: (_) => WorkerSignup2Screen(
-                                        name: _nameCtrl.text.trim(),
-                                        phone: _phoneCtrl.text.trim(),
-                                        nationalId: _idCtrl.text.trim(),
-                                      ),
-                                    ));
-                                  }
-                                },
-                                child: Container(
-                                  width: 70, height: 70,
-                                  decoration: const BoxDecoration(
-                                    gradient: AppColors.mainGradient,
-                                    shape: BoxShape.circle,
+                          ),
+                        ),
+
+                        // Fixed footer — never scrolls
+                        Padding(
+                          padding: EdgeInsets.only(
+                            left: 45, right: 45, top: 8,
+                            bottom: MediaQuery.of(context).padding.bottom + 110,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    if (_formKey.currentState!.validate()) {
+                                      Navigator.push(context, MaterialPageRoute(
+                                        builder: (_) => WorkerSignup2Screen(
+                                          name: _nameCtrl.text.trim(),
+                                          phone: _phoneCtrl.text.trim(),
+                                          nationalId: _idCtrl.text.trim(),
+                                        ),
+                                      ));
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 70, height: 70,
+                                    decoration: const BoxDecoration(
+                                      gradient: AppColors.mainGradient,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 30),
                                   ),
-                                  child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 30),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 30),
-                            ScreenHelpers.signInLink(context),
-                          ],
+                              const SizedBox(height: 16),
+                              ScreenHelpers.signInLink(context),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),

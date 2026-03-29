@@ -14,14 +14,14 @@ class WorkJob {
 }
 
 const List<WorkJob> workJobs = [
-  WorkJob(title: 'Mechanic',    description: 'Repair and maintain vehicles',                       imagePath: 'assets/images/mechanic.png'),
-  WorkJob(title: 'Teacher',     description: 'Educate and guide students',                         imagePath: 'assets/images/teacher.png'),
-  WorkJob(title: 'Plumber',     description: 'Fix and install water and drainage systems',         imagePath: 'assets/images/plumber.png'),
-  WorkJob(title: 'Electrician', description: 'Install and repair electrical and wiring systems',   imagePath: 'assets/images/electrician.png'),
-  WorkJob(title: 'Cleaner',     description: 'Perform thorough cleaning and tidying',              imagePath: 'assets/images/cleaner.png'),
+  WorkJob(title: 'Mechanic',    description: 'Repair and maintain vehicles',                           imagePath: 'assets/images/mechanic.png'),
+  WorkJob(title: 'Teacher',     description: 'Educate and guide students',                             imagePath: 'assets/images/teacher.png'),
+  WorkJob(title: 'Plumber',     description: 'Fix and install water and drainage systems',             imagePath: 'assets/images/plumber.png'),
+  WorkJob(title: 'Electrician', description: 'Install and repair electrical and wiring systems',       imagePath: 'assets/images/electrician.png'),
+  WorkJob(title: 'Cleaner',     description: 'Perform thorough cleaning and tidying',                  imagePath: 'assets/images/cleaner.png'),
   WorkJob(title: 'Caregiver',   description: 'Assist individuals with daily living and personal care', imagePath: 'assets/images/caregiver.png'),
   WorkJob(title: 'Mason',       description: 'Build and repair structures with stone, brick or concrete', imagePath: 'assets/images/mason.png'),
-  WorkJob(title: 'Handyman',    description: 'Handle small repairs, maintenance and odd jobs',     imagePath: 'assets/images/handyman.png'),
+  WorkJob(title: 'Handyman',    description: 'Handle small repairs, maintenance and odd jobs',         imagePath: 'assets/images/handyman.png'),
 ];
 
 class WorkerSignup2Screen extends StatefulWidget {
@@ -41,11 +41,18 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    // ── ADJUST THIS: total height of the white layer (button + sign-in + spacing) ──
+    const double whiteLayerHeight = 160; // <-- change this value
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
+          // Background gradient
           Container(decoration: const BoxDecoration(gradient: AppColors.mainGradient)),
+
           SafeArea(
             child: Column(
               children: [
@@ -63,6 +70,7 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Header
                         Padding(
                           padding: const EdgeInsets.fromLTRB(40, 28, 40, 0),
                           child: Column(
@@ -82,10 +90,12 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                             ],
                           ),
                         ),
-                        // ✅ Scrollable job cards
+
+                        // Scrollable job cards
                         Expanded(
                           child: ListView.builder(
-                            padding: const EdgeInsets.fromLTRB(40, 0, 40, 16),
+                            padding: EdgeInsets.fromLTRB(
+                              40, 0, 40, bottomPadding + whiteLayerHeight),
                             itemCount: workJobs.length,
                             itemBuilder: (_, i) {
                               final job = workJobs[i];
@@ -98,7 +108,6 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14, horizontal: 16),
                                   decoration: BoxDecoration(
-                                    // ✅ gradient when selected, white card when not
                                     gradient: selected ? AppColors.mainGradient : null,
                                     color: selected ? null : Colors.white,
                                     borderRadius: BorderRadius.circular(16),
@@ -113,7 +122,6 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      // Left — title and description
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,31 +130,24 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                                               style: GoogleFonts.poppins(
                                                 fontSize: 15,
                                                 fontWeight: FontWeight.w600,
-                                                color: selected
-                                                    ? Colors.white
-                                                    : AppColors.neutral1,
+                                                color: selected ? Colors.white : AppColors.neutral1,
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(job.description,
                                               style: GoogleFonts.poppins(
                                                 fontSize: 11,
-                                                color: selected
-                                                    ? Colors.white70
-                                                    : AppColors.neutral2,
+                                                color: selected ? Colors.white70 : AppColors.neutral2,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
                                       const SizedBox(width: 12),
-                                      // Right — PNG image
                                       Image.asset(
                                         job.imagePath,
-                                        width: 60,
-                                        height: 60,
+                                        width: 60, height: 60,
                                         fit: BoxFit.contain,
-                                        // ✅ fallback if image not found yet
                                         errorBuilder: (_, __, ___) => Container(
                                           width: 60, height: 60,
                                           decoration: BoxDecoration(
@@ -164,52 +165,6 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
                             },
                           ),
                         ),
-                        // Bottom — arrow button + sign in link
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(28, 8, 28, 16),
-                          child: Column(
-                            children: [
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: GestureDetector(
-                                  onTap: _selected == null ? null : () {
-                                    Navigator.push(context, MaterialPageRoute(
-                                      builder: (_) => WorkerSignup3Screen(
-                                        name: widget.name,
-                                        phone: widget.phone,
-                                        nationalId: widget.nationalId,
-                                        jobType: _selected!,
-                                      ),
-                                    ));
-                                  },
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    width: 70, height: 70,
-                                    decoration: BoxDecoration(
-                                      gradient: _selected != null
-                                          ? AppColors.mainGradient
-                                          : null,
-                                      color: _selected == null
-                                          ? AppColors.primary4
-                                          : null,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.arrow_forward_rounded,
-                                      color: _selected != null
-                                          ? Colors.white
-                                          : AppColors.neutral4,
-                                      size: 30,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              ScreenHelpers.signInLink(context),
-                              const SizedBox(height: 70),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -217,11 +172,89 @@ class _WorkerSignup2ScreenState extends State<WorkerSignup2Screen> {
               ],
             ),
           ),
+
+          // ── White layer — sits above the list, below the button ──
+          // ── ADJUST whiteLayerHeight at the top to resize this ──
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            height: bottomPadding + whiteLayerHeight,
+            child: Column(
+              children: [
+                // Fade edge at the top of the white layer
+                // ── ADJUST this height to make the fade taller or shorter ──
+                Container(
+                  height: 30, // <-- change this value
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.white,
+                        Colors.white.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(child: Container(color: Colors.white)),
+              ],
+            ),
+          ),
+
+          // ── bottom-line.png on top of white layer ──
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: Image.asset(
               'assets/images/bottom-line.png',
               fit: BoxFit.fitWidth,
+            ),
+          ),
+
+          // ── Arrow button + sign-in link on top of everything ──
+          Positioned(
+            bottom: bottomPadding + 100,
+            left: 28, right: 28,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: _selected == null ? null : () {
+                      Navigator.push(context, MaterialPageRoute(
+                        builder: (_) => WorkerSignup3Screen(
+                          name: widget.name,
+                          phone: widget.phone,
+                          nationalId: widget.nationalId,
+                          jobType: _selected!,
+                        ),
+                      ));
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 70, height: 70,
+                      decoration: BoxDecoration(
+                        gradient: _selected != null ? AppColors.mainGradient : null,
+                        color: _selected == null ? AppColors.primary4 : null,
+                        shape: BoxShape.circle,
+                        boxShadow: _selected != null
+                            ? [BoxShadow(
+                                color: AppColors.primary.withOpacity(0.35),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              )]
+                            : null,
+                      ),
+                      child: Icon(
+                        Icons.arrow_forward_rounded,
+                        color: _selected != null ? Colors.white : AppColors.neutral4,
+                        size: 30,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ScreenHelpers.signInLink(context),
+              ],
             ),
           ),
         ],

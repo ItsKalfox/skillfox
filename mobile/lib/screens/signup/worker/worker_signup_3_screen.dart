@@ -19,6 +19,7 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
   File? _nicFront, _nicBack, _profilePhoto;
   List<File> _certifications = [];
   bool _uploading = false;
+  bool _validated = false; // true after first failed attempt
   final _picker = ImagePicker();
 
   Future<void> _pick(String type) async {
@@ -52,9 +53,7 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
 
   Future<void> _proceed() async {
     if (!_canProceed) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload all required documents (min 3 certifications)')),
-      );
+      setState(() => _validated = true);
       return;
     }
     setState(() => _uploading = true);
@@ -81,41 +80,111 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
     ));
   }
 
-  Widget _uploadBox(String label, File? file, VoidCallback onTap, {bool small = false}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: small ? 90 : double.infinity,
-        height: small ? 90 : 80,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF2F2F2),
-          borderRadius: BorderRadius.circular(12),
-          border: file != null ? Border.all(color: AppColors.primary, width: 1.5) : null,
+  // Label row: shows label + red star if field is missing and validated
+  Widget _fieldLabel(String text, bool hasError) {
+    return Row(
+      children: [
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: AppColors.neutral1, // ✅ ALWAYS same color
+          ),
         ),
-        child: file != null
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(11),
-                child: Image.file(file, fit: BoxFit.cover),
-              )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.add, color: AppColors.neutral4, size: 28),
-                  if (!small) ...[
-                    const SizedBox(height: 4),
-                    Text(label,
-                      style: GoogleFonts.poppins(fontSize: 11, color: AppColors.neutral4),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ],
+        if (hasError) ...[
+          const SizedBox(width: 5),
+          const Text(
+            '*',
+            style: TextStyle(
+              color: Color(0xFFE53935),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            'Required',
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: const Color(0xFFE53935),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Upload box with optional remove (X) button overlay
+  Widget _uploadBox(String label, File? file, VoidCallback onTap,
+      {bool small = false, VoidCallback? onRemove}) {
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: small ? 90 : double.infinity,
+            height: small ? 90 : 80,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(12),
+              border: file != null
+                  ? Border.all(color: AppColors.primary, width: 1.5)
+                  : null,
+            ),
+            child: file != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Image.file(file, fit: BoxFit.cover),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add, color: AppColors.neutral4, size: 28),
+                      if (!small) ...[
+                        const SizedBox(height: 4),
+                        Text(label,
+                          style: GoogleFonts.poppins(
+                            fontSize: 11, color: AppColors.neutral4),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+        // Red X button — only shown when a file is set
+        if (file != null && onRemove != null)
+          Positioned(
+            top: 0, right: 0,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 22, height: 22,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE53935),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 13),
               ),
-      ),
+            ),
+          ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
+    // ── ADJUST THIS: total height of the white layer ──
+    const double whiteLayerHeight = 160.0; // <-- change this value
+
+    final bool nicFrontError  = _validated && _nicFront == null;
+    final bool nicBackError   = _validated && _nicBack == null;
+    final bool certError      = _validated && _certifications.length < 3;
+    final bool profileError   = _validated && _profilePhoto == null;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
@@ -135,44 +204,73 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
                       ),
                     ),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(left: 45, right: 45, top: 28),
+                      padding: EdgeInsets.only(
+                        left: 45, right: 45, top: 28,
+                        bottom: bottomPadding + whiteLayerHeight,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Upload required documents',
                             style: GoogleFonts.poppins(
-                              fontSize: 22, fontWeight: FontWeight.w700, color: AppColors.primary,
+                              fontSize: 22, fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
                             ),
                           ),
                           const SizedBox(height: 20),
-                          // NIC
-                          Text('Front and Back of National ID',
-                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
-                              color: AppColors.neutral1),
-                          ),
+
+                          // ── NIC ──
+                          _fieldLabel('Front and Back of National ID',
+                            nicFrontError || nicBackError),
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              Expanded(child: _uploadBox('National ID (front)', _nicFront,
-                                () => _pick('front'))),
+                              Expanded(
+                                child: _uploadBox(
+                                  'National ID (front)', _nicFront,
+                                  () => _pick('front'),
+                                  onRemove: () => setState(() => _nicFront = null),
+                                ),
+                              ),
                               const SizedBox(width: 12),
-                              Expanded(child: _uploadBox('National ID (back)', _nicBack,
-                                () => _pick('back'))),
+                              Expanded(
+                                child: _uploadBox(
+                                  'National ID (back)', _nicBack,
+                                  () => _pick('back'),
+                                  onRemove: () => setState(() => _nicBack = null),
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 20),
                           const Divider(color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 12),
-                          // Certifications
-                          Text('Proof of Skills or Certifications (Minimum 3)',
-                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
-                              color: AppColors.neutral1),
+
+                          // ── Certifications ──
+                          _fieldLabel(
+                            'Certifications (Min 3)',
+                            certError,
                           ),
+                          if (certError)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Please upload at least ${3 - _certifications.length} more',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11, color: const Color(0xFFE53935)),
+                              ),
+                            ),
                           const SizedBox(height: 10),
                           Wrap(
                             spacing: 10, runSpacing: 10,
                             children: [
-                              ..._certifications.map((f) => _uploadBox('', f, () {}, small: true)),
+                              ..._certifications.asMap().entries.map((e) =>
+                                _uploadBox('', e.value, () {},
+                                  small: true,
+                                  onRemove: () => setState(
+                                    () => _certifications.removeAt(e.key)),
+                                ),
+                              ),
                               if (_certifications.length < 5)
                                 GestureDetector(
                                   onTap: _pickCert,
@@ -187,7 +285,8 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
                                       children: [
                                         Icon(Icons.add, color: AppColors.neutral4, size: 28),
                                         Text('Upload',
-                                          style: GoogleFonts.poppins(fontSize: 11, color: AppColors.neutral4)),
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 11, color: AppColors.neutral4)),
                                       ],
                                     ),
                                   ),
@@ -197,35 +296,16 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
                           const SizedBox(height: 20),
                           const Divider(color: Color(0xFFF0F0F0)),
                           const SizedBox(height: 12),
-                          // Profile photo
-                          Text('Profile photo (32 x 32)',
-                            style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500,
-                              color: AppColors.neutral1),
-                          ),
+
+                          // ── Profile photo ──
+                          _fieldLabel('Profile photo', profileError),
                           const SizedBox(height: 10),
-                          _uploadBox('Upload', _profilePhoto, () => _pick('profile'), small: true),
-                          const SizedBox(height: 32),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: GestureDetector(
-                              onTap: _uploading ? null : _proceed,
-                              child: Container(
-                                width: 56, height: 56,
-                                decoration: const BoxDecoration(
-                                  gradient: AppColors.mainGradient,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: _uploading
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                      )
-                                    : const Icon(Icons.arrow_forward, color: Colors.white, size: 24),
-                              ),
-                            ),
+                          _uploadBox(
+                            'Upload', _profilePhoto,
+                            () => _pick('profile'),
+                            small: true,
+                            onRemove: () => setState(() => _profilePhoto = null),
                           ),
-                          const SizedBox(height: 16),
-                          ScreenHelpers.signInLink(context),
                         ],
                       ),
                     ),
@@ -234,11 +314,76 @@ class _WorkerSignup3ScreenState extends State<WorkerSignup3Screen> {
               ],
             ),
           ),
+
+          // ── White layer ──
           Positioned(
             bottom: 0, left: 0, right: 0,
-            child: Image.asset(
-              'assets/images/bottom-line.png',
-              fit: BoxFit.fitWidth,
+            height: bottomPadding + whiteLayerHeight,
+            child: Column(
+              children: [
+                // ── ADJUST this height to make the fade taller or shorter ──
+                Container(
+                  height: 30, // <-- change this value
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.white,
+                        Colors.white.withOpacity(0.0),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(child: Container(color: Colors.white)),
+              ],
+            ),
+          ),
+
+          // ── bottom-line.png ──
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: Image.asset('assets/images/bottom-line.png', fit: BoxFit.fitWidth),
+          ),
+
+          // ── Arrow button + sign-in link ──
+          Positioned(
+            bottom: bottomPadding + 100,
+            left: 28, right: 28,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: _uploading ? null : _proceed,
+                    child: Container(
+                      width: 70, height: 70,
+                      decoration: BoxDecoration(
+                        gradient: AppColors.mainGradient,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.35),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: _uploading
+                          ? const Padding(
+                              padding: EdgeInsets.all(18),
+                              child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Icon(Icons.arrow_forward_rounded,
+                              color: Colors.white, size: 30),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ScreenHelpers.signInLink(context),
+              ],
             ),
           ),
         ],
