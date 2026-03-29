@@ -40,17 +40,18 @@ class _CustomerSignup3ScreenState extends State<CustomerSignup3Screen> {
           const SnackBar(content: Text('Enter a valid email first')));
         return;
       }
-      final otp = OtpService().generateOtp();
-      await FirebaseFirestore.instance
-          .collection('otp_requests').doc(_emailCtrl.text.trim()).set({
-        'otp': otp,
-        'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 10))),
-        'email': _emailCtrl.text.trim(),
-      });
-      print('Customer Signup OTP: $otp');
-      setState(() => _otpSent = true);
+      final otp = await OtpService().sendSignupOtp(
+        _emailCtrl.text.trim(),
+        purpose: 'Customer Sign Up',
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP sent!')));
+      if (otp != null) {
+        setState(() => _otpSent = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OTP sent!')));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to send OTP. Try again.')));
+      }
     } else {
       final valid = await OtpService().verifyOtp(_emailCtrl.text.trim(), _otpCtrl.text.trim());
       if (!mounted) return;

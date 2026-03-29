@@ -47,21 +47,19 @@ class _WorkerSignup5ScreenState extends State<WorkerSignup5Screen> {
         const SnackBar(content: Text('Enter a valid email first')));
       return;
     }
-    final otp = OtpService().generateOtp();
-    final expiry = DateTime.now().add(const Duration(minutes: 10));
-    await FirebaseFirestore.instance
-        .collection('otp_requests')
-        .doc(_emailCtrl.text.trim())
-        .set({
-      'otp': otp,
-      'expiresAt': Timestamp.fromDate(expiry),
-      'email': _emailCtrl.text.trim(),
-    });
-    print('Signup OTP: $otp'); // TODO: send via email provider
-    setState(() => _otpSent = true);
+    final otp = await OtpService().sendSignupOtp(
+      _emailCtrl.text.trim(),
+      purpose: 'Worker Sign Up',
+    );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('OTP sent to your email!')));
+    if (otp != null) {
+      setState(() => _otpSent = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTP sent to your email!')));
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send OTP. Try again.')));
+    }
   }
 
   Future<void> _verifyOtp() async {

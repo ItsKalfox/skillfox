@@ -3,9 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/validators.dart';
 import '../../widgets/gradient_button.dart';
-import '../../widgets/app_text_field.dart';
 import 'password_success_screen.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
@@ -16,51 +14,36 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final _passCtrl = TextEditingController();
-  final _confirmCtrl = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
   bool _loading = false;
+  bool _sent = false;
 
-  bool get _enabled =>
-      _passCtrl.text.isNotEmpty &&
-      _confirmCtrl.text.isNotEmpty &&
-      _confirmCtrl.text == _passCtrl.text;
-
-  @override
-  void dispose() {
-    _passCtrl.dispose();
-    _confirmCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _changePassword() async {
-    if (!_formKey.currentState!.validate()) return;
-    final passError = Validators.password(_passCtrl.text);
-    if (passError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(passError)));
-      return;
-    }
+  Future<void> _sendResetLink() async {
     setState(() => _loading = true);
     try {
+      // Send Firebase's official password reset email
       await FirebaseAuth.instance.sendPasswordResetEmail(email: widget.email);
+
+      // Clean up the OTP request since we've completed the verification
       await FirebaseFirestore.instance
-          .collection('password_resets')
+          .collection('otp_requests')
           .doc(widget.email)
-          .set({
-        'newPassword': _passCtrl.text,
-        'requestedAt': FieldValue.serverTimestamp(),
-      });
-      if (!mounted) return;
-      Navigator.push(context,
-        MaterialPageRoute(builder: (_) => const PasswordSuccessScreen()));
+          .delete();
+
+      setState(() => _sent = true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to change password. Try again.')),
+        const SnackBar(content: Text('Failed to send reset link. Try again.')),
       );
     }
     setState(() => _loading = false);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Automatically send the reset link when this screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sendResetLink());
   }
 
   @override
@@ -106,56 +89,110 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.only(top: 24, left: 40, right: 40),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            const SizedBox(height: 24),
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(15),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF3629B7).withOpacity(0.07),
-                                    blurRadius: 30, offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  AppTextField(
-                                    label: 'Type your new password',
-                                    placeholder: '••••••••••••',
-                                    obscure: true,
-                                    controller: _passCtrl,
-                                    validator: Validators.password,
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  AppTextField(
-                                    label: 'Confirm password',
-                                    placeholder: '••••••••••••',
-                                    obscure: true,
-                                    controller: _confirmCtrl,
-                                    validator: (v) {
-                                      if (v != _passCtrl.text) return 'Passwords do not match';
-                                      return null;
-                                    },
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                  const SizedBox(height: 45),
-                                  GradientButton(
-                                    text: 'Change password',
-                                    onPressed: _enabled ? _changePassword : null,
-                                    isLoading: _loading,
-                                  ),
-                                ],
-                              ),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 40),
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF3629B7).withOpacity(0.07),
+                                  blurRadius: 30, offset: const Offset(0, 4),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                            child: Column(
+                              children: [
+                                // Icon
+                                Container(
+                                  width: 72, height: 72,
+                                  decoration: BoxDecoration(
+                                    gradient: AppColors.mainGradient,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(
+                                    Icons.mark_email_read_rounded,
+                                    color: Colors.white, size: 36,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+
+                                if (_loading && !_sent) ...[
+                                  const CircularProgressIndicator(),
+                                  const SizedBox(height: 16),
+                                  Text('Sending reset link...',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 14, color: AppColors.neutral2)),
+                                ] else if (_sent) ...[
+                                  Text('Reset link sent!',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 18, fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  RichText(
+                                    textAlign: TextAlign.center,
+                                    text: TextSpan(children: [
+                                      TextSpan(
+                                        text: 'We\'ve sent a password reset link to ',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14, color: AppColors.neutral1,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: widget.email,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14, fontWeight: FontWeight.w600,
+                                          color: AppColors.primary2,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: '. Open the link in the email to set your new password.',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14, color: AppColors.neutral1,
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ]),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Check your spam folder if you don\'t see it.',
+                                    textAlign: TextAlign.center,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12, color: AppColors.neutral2),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  GradientButton(
+                                    text: 'Back to Sign In',
+                                    onPressed: () => Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PasswordSuccessScreen()),
+                                      (_) => false,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  GestureDetector(
+                                    onTap: _loading ? null : _sendResetLink,
+                                    child: Text('Resend link',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14, fontWeight: FontWeight.w500,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

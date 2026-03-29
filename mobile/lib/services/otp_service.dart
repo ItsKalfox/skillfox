@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'email_service.dart';
 
 class OtpService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -9,6 +10,7 @@ class OtpService {
     return (1000 + rand.nextInt(9000)).toString();
   }
 
+  /// Sends an OTP for password-reset flow (checks that email exists first).
   Future<String?> sendOtp(String email) async {
     try {
       // Check email exists in users collection
@@ -20,7 +22,7 @@ class OtpService {
 
       if (query.docs.isEmpty) return null; // email not found
 
-      final otp = generateOtp(); // ✅ fixed — was _generateOtp()
+      final otp = generateOtp();
       final expiry = DateTime.now().add(const Duration(minutes: 10));
 
       await _firestore.collection('otp_requests').doc(email).set({
@@ -29,8 +31,43 @@ class OtpService {
         'email': email,
       });
 
-      // TODO: Integrate email provider (SendGrid, Mailgun, Firebase Extensions, etc.)
-      print('OTP for $email: $otp');
+      // Send styled email
+      final sent = await EmailService.sendOtpEmail(
+        recipientEmail: email,
+        otp: otp,
+        purpose: 'Password Reset',
+      );
+      if (!sent) {
+        print('⚠ Email delivery failed for $email — OTP stored in Firestore.');
+      }
+
+      return otp;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Sends an OTP for signup flows (no prior user check needed).
+  Future<String?> sendSignupOtp(String email, {String purpose = 'Sign Up'}) async {
+    try {
+      final otp = generateOtp();
+      final expiry = DateTime.now().add(const Duration(minutes: 10));
+
+      await _firestore.collection('otp_requests').doc(email).set({
+        'otp': otp,
+        'expiresAt': Timestamp.fromDate(expiry),
+        'email': email,
+      });
+
+      // Send styled email
+      final sent = await EmailService.sendOtpEmail(
+        recipientEmail: email,
+        otp: otp,
+        purpose: purpose,
+      );
+      if (!sent) {
+        print('⚠ Email delivery failed for $email — OTP stored in Firestore.');
+      }
 
       return otp;
     } catch (e) {

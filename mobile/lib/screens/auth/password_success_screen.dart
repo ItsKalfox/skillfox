@@ -54,7 +54,8 @@ class PasswordSuccessScreen extends StatelessWidget {
                           ),
 
                           const SizedBox(height: 0),
-                          Text('Change password successfully!',
+                          Text('Reset link sent!',
+
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
                               fontSize: 16, fontWeight: FontWeight.w600,
@@ -63,7 +64,7 @@ class PasswordSuccessScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'You have successfully changed your password.\nPlease use the new password when signing in.',
+                            'A password reset link has been sent to your email.\nOpen the link to set your new password, then sign in.',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.poppins(
                               fontSize: 14, color: AppColors.neutral1),
