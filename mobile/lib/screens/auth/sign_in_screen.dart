@@ -21,6 +21,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
+  String? _credentialError; // Add error state
 
   @override
   void dispose() {
@@ -31,12 +32,20 @@ class _SignInScreenState extends State<SignInScreen> {
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // Clear previous error
+    setState(() {
+      _credentialError = null;
+    });
+
     final provider = context.read<AuthProvider>();
     final success = await provider.signIn(
       _emailCtrl.text.trim(),
       _passCtrl.text,
     );
+    
     if (!mounted) return;
+    
     if (success) {
       final userData = provider.userData;
       final role = userData?['role'];
@@ -54,6 +63,11 @@ class _SignInScreenState extends State<SignInScreen> {
           (_) => false,
         );
       }
+    } else {
+      // Show error when credentials are wrong
+      setState(() {
+        _credentialError = 'Email or password is incorrect';
+      });
     }
   }
 
@@ -115,8 +129,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         top: 24,
                         left: 45,
                         right: 45,
-                        bottom:
-                            120,
+                        bottom: 120,
                       ),
                       child: Form(
                         key: _formKey,
@@ -164,6 +177,18 @@ class _SignInScreenState extends State<SignInScreen> {
                                   ? 'Password required'
                                   : null,
                             ),
+                            // Display credential error
+                            if (_credentialError != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                _credentialError!,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             Align(
                               alignment: Alignment.centerRight,
